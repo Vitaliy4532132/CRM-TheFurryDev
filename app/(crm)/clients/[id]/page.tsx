@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Send, Mail, MapPin, Calendar,
-  MessageSquare, ClipboardList, ShoppingCart,
+  MessageSquare, ClipboardList, ShoppingCart, Globe,
 } from 'lucide-react'
 import { getClientById, getOrdersByClient } from '@/lib/crm/api'
 import { ORDER_STATUS_LABELS } from '@/types/crm'
@@ -218,8 +218,15 @@ export default function ClientCardPage() {
                 {client.name[0].toUpperCase()}
               </div>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--crm-text)', lineHeight: 1.2 }}>
-                  {client.name}
+                <div style={{ display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--crm-text)', lineHeight: 1.2 }}>
+                    {client.name}
+                  </div>
+                  {client.profile_id && (
+                    <span style={{ display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,color:'var(--crm-teal)',background:'var(--crm-teal-dim)' }}>
+                      <Globe size={11} strokeWidth={2}/>Синхронизирован с сайта
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--crm-muted)', marginTop: 4 }}>
                   Клиент с {formatDate(client.created_at)}

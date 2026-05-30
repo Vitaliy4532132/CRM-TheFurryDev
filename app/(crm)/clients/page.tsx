@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { UserPlus, Search, Send, Eye, Pencil, Trash2, Users, ShoppingCart } from 'lucide-react'
+import { UserPlus, Search, Send, Eye, Pencil, Trash2, Users, ShoppingCart, Globe } from 'lucide-react'
 import Link from 'next/link'
 import { getClients, deleteCRMClient } from '@/lib/crm/api'
 import { CreateClientModal } from '@/components/crm/modals/create-client-modal'
@@ -324,13 +324,20 @@ export default function ClientsPage() {
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Avatar name={client.name} />
-                      <Link
-                        href={`/clients/${client.id}`}
-                        style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', whiteSpace: 'nowrap', textDecoration: 'none' }}
-                        className="crm-client-name-link"
-                      >
-                        {client.name}
-                      </Link>
+                      <div style={{ display:'flex',flexDirection:'column',gap:2 }}>
+                        <Link
+                          href={`/clients/${client.id}`}
+                          style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', whiteSpace: 'nowrap', textDecoration: 'none' }}
+                          className="crm-client-name-link"
+                        >
+                          {client.name}
+                        </Link>
+                        {client.profile_id && (
+                          <span style={{ display:'inline-flex',alignItems:'center',gap:3,fontSize:10,fontWeight:600,color:'var(--crm-teal)',letterSpacing:'0.03em' }}>
+                            <Globe size={9} strokeWidth={2}/>САЙТ
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td style={{ padding: '12px 14px' }}>
