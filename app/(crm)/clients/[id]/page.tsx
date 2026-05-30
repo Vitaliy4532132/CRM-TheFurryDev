@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Send, Mail, MapPin, Calendar,
-  MessageSquare, ClipboardList,
+  MessageSquare, ClipboardList, ShoppingCart,
 } from 'lucide-react'
 import { getClientById, getOrdersByClient } from '@/lib/crm/api'
 import { ORDER_STATUS_LABELS } from '@/types/crm'
@@ -67,8 +67,8 @@ function PageSkeleton() {
           {[110, 130, 130, 90, 100].map((w, i) => <Skel key={i} w={w} h={34} />)}
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        {[0,1,2].map(i => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        {[0,1,2,3].map(i => (
           <div key={i} style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 12, padding: '18px 20px' }}>
             <Skel w={100} h={12} />
             <div style={{ marginTop: 8 }}><Skel w={80} h={28} /></div>
@@ -263,18 +263,22 @@ export default function ClientCardPage() {
           </div>
 
           {/* ── Stats ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {[
-              { label: 'Всего заказов', value: String(totalOrders), color: 'var(--crm-blue)' },
-              { label: 'Общая сумма',   value: money(totalAmount),  color: 'var(--crm-green)' },
-              { label: 'Неоплачено',    value: money(totalUnpaid),  color: 'var(--crm-red)' },
+              { label: 'Всего заказов',      value: String(totalOrders),              color: 'var(--crm-blue)',   icon: null },
+              { label: 'Общая сумма',         value: money(totalAmount),               color: 'var(--crm-green)',  icon: null },
+              { label: 'Неоплачено',          value: money(totalUnpaid),               color: 'var(--crm-red)',    icon: null },
+              { label: 'Потрачено на сайте',  value: money(client.total_spent ?? 0),   color: 'var(--crm-purple)', icon: ShoppingCart },
             ].map((s) => (
               <div key={s.label} style={{
                 background: 'var(--crm-surface)',
                 border: '1px solid var(--crm-border2)',
                 borderRadius: 12, padding: '18px 20px',
               }}>
-                <div style={{ fontSize: 12, color: 'var(--crm-muted)', marginBottom: 8 }}>{s.label}</div>
+                <div style={{ display:'flex',alignItems:'center',gap:6,fontSize: 12, color: 'var(--crm-muted)', marginBottom: 8 }}>
+                  {s.icon && <s.icon size={12} strokeWidth={2} style={{ color: s.color, flexShrink:0 }}/>}
+                  {s.label}
+                </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: s.color, letterSpacing: '-0.02em' }}>
                   {s.value}
                 </div>

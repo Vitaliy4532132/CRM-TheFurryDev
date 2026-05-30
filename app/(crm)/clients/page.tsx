@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { UserPlus, Search, Send, Eye, Pencil, Trash2, Users } from 'lucide-react'
+import { UserPlus, Search, Send, Eye, Pencil, Trash2, Users, ShoppingCart } from 'lucide-react'
 import Link from 'next/link'
 import { getClients, deleteCRMClient } from '@/lib/crm/api'
 import { CreateClientModal } from '@/components/crm/modals/create-client-modal'
@@ -357,10 +357,17 @@ export default function ClientsPage() {
                     {client.country ?? '—'}
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', textAlign: 'center' }}>
-                    0
+                    {client.orders?.length ?? 0}
                   </td>
-                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', whiteSpace: 'nowrap' }}>
-                    0 ₽
+                  <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {client.total_spent > 0 ? (
+                      <span style={{ display:'inline-flex',alignItems:'center',gap:5,color:'var(--crm-purple)' }}>
+                        <ShoppingCart size={12} strokeWidth={2}/>
+                        {client.total_spent.toLocaleString('ru-RU')} ₽
+                      </span>
+                    ) : (
+                      <span style={{ color:'var(--crm-muted)' }}>—</span>
+                    )}
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--crm-muted)', whiteSpace: 'nowrap' }}>
                     {formatDate(client.created_at)}

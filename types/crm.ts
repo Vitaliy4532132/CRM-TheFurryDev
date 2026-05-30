@@ -64,14 +64,16 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 // ─── Entities ────────────────────────────────────────────────────────────────
 
 export interface CRMClient {
-  id:         string
-  name:       string
-  telegram:   string | null
-  discord:    string | null
-  email:      string | null
-  country:    string | null
-  note:       string | null
-  created_at: string
+  id:          string
+  name:        string
+  telegram:    string | null
+  discord:     string | null
+  email:       string | null
+  country:     string | null
+  note:        string | null
+  profile_id:  string | null   // linked to profiles.id (auto-sync from site)
+  total_spent: number          // sum of purchases from site (via trigger)
+  created_at:  string
   // joined
   orders?: CRMOrder[]
 }

@@ -31,7 +31,7 @@ export async function getClientById(id: string): Promise<CRMClient> {
 }
 
 export async function createCRMClient(
-  input: Omit<CRMClient, 'id' | 'created_at' | 'orders'>,
+  input: Omit<CRMClient, 'id' | 'created_at' | 'orders' | 'profile_id' | 'total_spent'>,
 ): Promise<CRMClient> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -45,7 +45,7 @@ export async function createCRMClient(
 
 export async function updateCRMClient(
   id: string,
-  input: Partial<Omit<CRMClient, 'id' | 'created_at' | 'orders'>>,
+  input: Partial<Omit<CRMClient, 'id' | 'created_at' | 'orders' | 'profile_id' | 'total_spent'>>,
 ): Promise<CRMClient> {
   const supabase = createClient()
   const { data, error } = await supabase
