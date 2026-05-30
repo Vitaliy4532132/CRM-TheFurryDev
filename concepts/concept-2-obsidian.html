@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Концепт 2 — OBSIDIAN</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0A0A0F;--surface:#111118;--s2:#18181F;--s3:#1F1F28;
+    --gold:#C9A84C;--gold-dim:rgba(201,168,76,.12);--gold-glow:rgba(201,168,76,.2);
+    --text:#E8E6E0;--muted:#5A5868;--muted2:#3A3848;
+    --border:#1E1E28;--border2:#28283A;
+    --success:#4ADE80;--danger:#F87171;--info:#60A5FA;
+  }
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:'DM Sans',sans-serif;font-size:14px;
+    min-height:100vh;letter-spacing:.01em;
+  }
+
+  /* Subtle noise texture */
+  body::after{
+    content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    opacity:.4;pointer-events:none;z-index:9998;
+  }
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+  /* Layout */
+  .layout{display:flex;height:100vh;overflow:hidden}
+
+  /* Sidebar */
+  .sidebar{
+    width:240px;background:var(--surface);
+    border-right:1px solid var(--border);
+    display:flex;flex-direction:column;flex-shrink:0;
+  }
+  .sidebar-logo{
+    padding:28px 24px 24px;
+    border-bottom:1px solid var(--border);
+  }
+  .logo-mark{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:36px;height:36px;
+    background:linear-gradient(135deg,var(--gold),#8B6914);
+    border-radius:6px;
+    font-family:'Syne',sans-serif;font-weight:800;font-size:16px;
+    color:#0A0A0F;margin-bottom:14px;
+  }
+  .logo-name{
+    font-family:'Syne',sans-serif;font-size:15px;font-weight:700;
+    letter-spacing:.04em;color:var(--text);margin-bottom:3px;
+  }
+  .logo-sub{font-size:11px;color:var(--muted);font-weight:300;letter-spacing:.03em}
+
+  nav{flex:1;padding:16px 12px;overflow-y:auto}
+  .nav-section{font-size:10px;letter-spacing:.12em;color:var(--muted);font-weight:500;
+    padding:4px 12px 8px;text-transform:uppercase}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;
+    padding:10px 12px;border-radius:8px;cursor:pointer;
+    font-size:13px;font-weight:400;color:var(--muted);
+    transition:all .15s;margin-bottom:2px;
+  }
+  .nav-item:hover{background:var(--s2);color:var(--text)}
+  .nav-item.active{
+    background:var(--gold-dim);color:var(--gold);font-weight:500;
+  }
+  .nav-item.active .nav-icon{color:var(--gold)}
+  .nav-icon{width:16px;text-align:center;font-size:14px;opacity:.7}
+  .nav-badge{
+    margin-left:auto;font-size:10px;font-weight:600;
+    background:var(--gold-dim);color:var(--gold);
+    padding:2px 7px;border-radius:99px;
+  }
+
+  .sidebar-foot{
+    padding:16px 24px;border-top:1px solid var(--border);
+  }
+  .user-row{display:flex;align-items:center;gap:10px}
+  .user-ava{
+    width:32px;height:32px;border-radius:8px;
+    background:linear-gradient(135deg,var(--gold),#5C4010);
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;color:#0A0A0F;font-family:'Syne',sans-serif;
+  }
+  .user-name{font-size:12px;font-weight:500;color:var(--text)}
+  .user-role{font-size:10px;color:var(--muted);margin-top:1px}
+  .status-dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--success);margin-left:auto;
+    box-shadow:0 0 6px rgba(74,222,128,.4);
+  }
+
+  /* Main */
+  .main{flex:1;overflow-y:auto;padding:32px 36px;display:flex;flex-direction:column;gap:24px}
+
+  /* Topbar */
+  .topbar{display:flex;align-items:center;justify-content:space-between}
+  .page-eyebrow{font-size:11px;color:var(--muted);font-weight:400;margin-bottom:5px;letter-spacing:.03em}
+  .page-title{
+    font-family:'Syne',sans-serif;font-size:26px;font-weight:800;
+    letter-spacing:.02em;color:var(--text);
+  }
+  .topbar-right{display:flex;gap:10px;align-items:center}
+  .btn{
+    padding:9px 20px;border-radius:8px;font-size:13px;
+    font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;
+    border:none;transition:all .15s;
+  }
+  .btn-gold{
+    background:linear-gradient(135deg,var(--gold),#8B6914);
+    color:#0A0A0F;font-weight:600;
+  }
+  .btn-gold:hover{filter:brightness(1.1)}
+  .btn-ghost{
+    background:transparent;color:var(--muted);
+    border:1px solid var(--border2);border-radius:8px;
+  }
+  .btn-ghost:hover{color:var(--text);border-color:var(--muted2)}
+
+  /* Stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .stat{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:20px;position:relative;overflow:hidden;
+    transition:border-color .2s;
+  }
+  .stat:hover{border-color:var(--border2)}
+  .stat-icon{
+    width:36px;height:36px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;margin-bottom:14px;
+  }
+  .stat-icon.gold{background:var(--gold-dim)}
+  .stat-icon.green{background:rgba(74,222,128,.1)}
+  .stat-icon.blue{background:rgba(96,165,250,.1)}
+  .stat-icon.red{background:rgba(248,113,113,.1)}
+  .stat-label{font-size:12px;color:var(--muted);font-weight:400;margin-bottom:6px}
+  .stat-val{
+    font-family:'Syne',sans-serif;font-size:24px;font-weight:700;
+    color:var(--text);letter-spacing:.01em;margin-bottom:8px;
+  }
+  .stat-delta{
+    display:inline-flex;align-items:center;gap:4px;
+    font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;
+  }
+  .stat-delta.pos{color:var(--success);background:rgba(74,222,128,.1)}
+  .stat-delta.neg{color:var(--danger);background:rgba(248,113,113,.1)}
+  /* Shimmer line */
+  .stat::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,var(--gold-dim),transparent);
+  }
+
+  /* Content grid */
+  .content-grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
+
+  /* Panel */
+  .panel{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:22px;
+  }
+  .panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .panel-title{
+    font-family:'Syne',sans-serif;font-size:15px;font-weight:700;
+    letter-spacing:.02em;
+  }
+  .panel-link{font-size:12px;color:var(--gold);cursor:pointer}
+  .panel-link:hover{text-decoration:underline}
+
+  table{width:100%;border-collapse:collapse}
+  th{
+    padding:10px 12px;text-align:left;
+    font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.04em;
+    border-bottom:1px solid var(--border);
+  }
+  tbody tr{transition:background .12s;cursor:pointer;border-radius:8px}
+  tbody tr:hover td{background:var(--s2)}
+  td{padding:11px 12px;font-size:13px;border-bottom:1px solid var(--border)}
+  td:first-child{border-radius:8px 0 0 8px}
+  td:last-child{border-radius:0 8px 8px 0}
+
+  .badge{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:3px 10px;border-radius:99px;font-size:11px;font-weight:500;
+  }
+  .badge::before{content:'';width:5px;height:5px;border-radius:50%}
+  .badge-green{color:var(--success);background:rgba(74,222,128,.1)}
+  .badge-green::before{background:var(--success)}
+  .badge-yellow{color:#FBBF24;background:rgba(251,191,36,.1)}
+  .badge-yellow::before{background:#FBBF24}
+  .badge-blue{color:var(--info);background:rgba(96,165,250,.1)}
+  .badge-blue::before{background:var(--info)}
+  .badge-grey{color:var(--muted);background:rgba(74,74,90,.12)}
+  .badge-grey::before{background:var(--muted)}
+  .badge-red{color:var(--danger);background:rgba(248,113,113,.1)}
+  .badge-red::before{background:var(--danger)}
+
+  /* Progress */
+  .prog{width:70px;height:4px;background:var(--s3);border-radius:99px;overflow:hidden;display:inline-block}
+  .prog-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),#8B6914)}
+  .prog-fill.grey{background:var(--muted2)}
+  .prog-fill.red{background:linear-gradient(90deg,var(--danger),#B91C1C)}
+
+  /* Activity */
+  .act-list{display:flex;flex-direction:column;gap:4px}
+  .act-item{
+    display:flex;align-items:center;gap:12px;
+    padding:12px;border-radius:8px;cursor:pointer;
+    transition:background .12s;
+  }
+  .act-item:hover{background:var(--s2)}
+  .act-dot{
+    width:36px;height:36px;border-radius:8px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:14px;
+  }
+  .act-dot.inc{background:rgba(74,222,128,.1)}
+  .act-dot.exp{background:rgba(248,113,113,.1)}
+  .act-body{flex:1;min-width:0}
+  .act-name{font-size:12px;font-weight:500;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .act-date{font-size:11px;color:var(--muted)}
+  .act-sum{font-size:13px;font-weight:600;white-space:nowrap}
+  .act-sum.inc{color:var(--success)}
+  .act-sum.exp{color:var(--danger)}
+
+  /* Concept tag */
+  .concept-tag{
+    position:fixed;bottom:20px;right:20px;z-index:100;
+    font-size:11px;color:var(--muted);
+    background:var(--surface);border:1px solid var(--border2);
+    padding:7px 14px;border-radius:8px;
+    font-family:'DM Sans',sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">F</div>
+      <div class="logo-name">FurryPanel</div>
+      <div class="logo-sub">CRM Dashboard</div>
+    </div>
+    <nav>
+      <div class="nav-section">Главное</div>
+      <div class="nav-item active"><span class="nav-icon">⊞</span> Dashboard</div>
+      <div class="nav-item"><span class="nav-icon">◎</span> Клиенты <span class="nav-badge">8</span></div>
+      <div class="nav-item"><span class="nav-icon">◻</span> Заказы <span class="nav-badge">5</span></div>
+      <div class="nav-section" style="margin-top:8px">Финансы</div>
+      <div class="nav-item"><span class="nav-icon">◈</span> Финансы</div>
+      <div class="nav-item"><span class="nav-icon">◧</span> Услуги</div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-row">
+        <div class="user-ava">AD</div>
+        <div>
+          <div class="user-name">Admin</div>
+          <div class="user-role">TheFurryDev</div>
+        </div>
+        <div class="status-dot"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-eyebrow">Добро пожаловать, Admin 👋</div>
+        <div class="page-title">Dashboard</div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-ghost">Экспорт</button>
+        <button class="btn btn-gold">+ Новый заказ</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-icon gold">👥</div>
+        <div class="stat-label">Всего клиентов</div>
+        <div class="stat-val">8</div>
+        <span class="stat-delta pos">↑ +2 за месяц</span>
+      </div>
+      <div class="stat">
+        <div class="stat-icon blue">📋</div>
+        <div class="stat-label">Активных заказов</div>
+        <div class="stat-val">5</div>
+        <span class="stat-delta pos">↑ +1 за неделю</span>
+      </div>
+      <div class="stat">
+        <div class="stat-icon green">💰</div>
+        <div class="stat-label">Доход / апрель</div>
+        <div class="stat-val">52 500 ₽</div>
+        <span class="stat-delta pos">↑ 19%</span>
+      </div>
+      <div class="stat">
+        <div class="stat-icon red">📉</div>
+        <div class="stat-label">Расход / апрель</div>
+        <div class="stat-val">8 300 ₽</div>
+        <span class="stat-delta neg">↑ 6%</span>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Последние заказы</div>
+          <span class="panel-link">Все заказы →</span>
+        </div>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Клиент</th><th>Услуга</th><th>Сумма</th><th>Статус</th><th>Прогресс</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--gold);font-family:'DM Mono',monospace;font-size:12px">ORD-0082</td>
+              <td style="font-weight:500">Sasha Pixel</td>
+              <td style="color:var(--muted)">Custom Map</td>
+              <td style="font-weight:600">25 000 ₽</td>
+              <td><span class="badge badge-green">В работе</span></td>
+              <td><div class="prog"><div class="prog-fill" style="width:62%"></div></div></td>
+            </tr>
+            <tr>
+              <td style="color:var(--gold);font-family:'DM Mono',monospace;font-size:12px">ORD-0083</td>
+              <td style="font-weight:500">Maria Chen</td>
+              <td style="color:var(--muted)">Discord Bot</td>
+              <td style="font-weight:600">12 000 ₽</td>
+              <td><span class="badge badge-blue">Проверка</span></td>
+              <td><div class="prog"><div class="prog-fill" style="width:90%"></div></div></td>
+            </tr>
+            <tr>
+              <td style="color:var(--gold);font-family:'DM Mono',monospace;font-size:12px">ORD-0085</td>
+              <td style="font-weight:500">Lena Storm</td>
+              <td style="color:var(--muted)">Skin Pack × 20</td>
+              <td style="font-weight:600">8 500 ₽</td>
+              <td><span class="badge badge-yellow">Новый</span></td>
+              <td><div class="prog"><div class="prog-fill" style="width:0%"></div></div></td>
+            </tr>
+            <tr>
+              <td style="color:var(--gold);font-family:'DM Mono',monospace;font-size:12px">ORD-0081</td>
+              <td style="font-weight:500">Alex Volkov</td>
+              <td style="color:var(--muted)">PvP Plugin Suite</td>
+              <td style="font-weight:600">18 000 ₽</td>
+              <td><span class="badge badge-grey">Готово</span></td>
+              <td><div class="prog"><div class="prog-fill grey" style="width:100%"></div></div></td>
+            </tr>
+            <tr>
+              <td style="color:var(--gold);font-family:'DM Mono',monospace;font-size:12px">ORD-0088</td>
+              <td style="font-weight:500">Ivan Kuznetsov</td>
+              <td style="color:var(--muted)">Map — Arena</td>
+              <td style="font-weight:600">5 000 ₽</td>
+              <td><span class="badge badge-red">Отменён</span></td>
+              <td><div class="prog"><div class="prog-fill red" style="width:100%"></div></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Транзакции</div>
+          <span class="panel-link">Все →</span>
+        </div>
+        <div class="act-list">
+          <div class="act-item">
+            <div class="act-dot inc">💵</div>
+            <div class="act-body">
+              <div class="act-name">Discord Bot</div>
+              <div class="act-date">25 апреля 2024</div>
+            </div>
+            <div class="act-sum inc">+12 000 ₽</div>
+          </div>
+          <div class="act-item">
+            <div class="act-dot inc">💵</div>
+            <div class="act-body">
+              <div class="act-name">PvP Plugin Suite</div>
+              <div class="act-date">14 апреля 2024</div>
+            </div>
+            <div class="act-sum inc">+18 000 ₽</div>
+          </div>
+          <div class="act-item">
+            <div class="act-dot exp">📤</div>
+            <div class="act-body">
+              <div class="act-name">Фриланс — Художник</div>
+              <div class="act-date">20 апреля 2024</div>
+            </div>
+            <div class="act-sum exp">-5 000 ₽</div>
+          </div>
+          <div class="act-item">
+            <div class="act-dot inc">💵</div>
+            <div class="act-body">
+              <div class="act-name">Server Config</div>
+              <div class="act-date">8 апреля 2024</div>
+            </div>
+            <div class="act-sum inc">+5 000 ₽</div>
+          </div>
+          <div class="act-item">
+            <div class="act-dot exp">📤</div>
+            <div class="act-body">
+              <div class="act-name">Adobe CC — Подписка</div>
+              <div class="act-date">1 апреля 2024</div>
+            </div>
+            <div class="act-sum exp">-2 500 ₽</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="concept-tag">Концепт 2 — OBSIDIAN</div>
+
+</body>
+</html>

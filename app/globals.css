@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* CRM Design Tokens */
+  --crm-bg:           #0F1117;
+  --crm-sidebar:      #13151F;
+  --crm-surface:      #1C1F2E;
+  --crm-surface-hover:#222640;
+  --crm-s3:           #272A3A;
+  --crm-blue:         #4F8EF7;
+  --crm-blue-dim:     rgba(79, 142, 247, 0.15);
+  --crm-blue-glow:    rgba(79, 142, 247, 0.25);
+  --crm-green:        #22C55E;
+  --crm-green-dim:    rgba(34, 197, 94, 0.12);
+  --crm-red:          #EF4444;
+  --crm-red-dim:      rgba(239, 68, 68, 0.12);
+  --crm-yellow:       #F59E0B;
+  --crm-yellow-dim:   rgba(245, 158, 11, 0.12);
+  --crm-orange:       #F97316;
+  --crm-orange-dim:   rgba(249, 115, 22, 0.12);
+  --crm-purple:       #A855F7;
+  --crm-purple-dim:   rgba(168, 85, 247, 0.12);
+  --crm-teal:         #14B8A6;
+  --crm-teal-dim:     rgba(20, 184, 166, 0.12);
+  --crm-text:         #E2E8F5;
+  --crm-muted:        #64748B;
+  --crm-muted2:       #3A4060;
+  --crm-border:       #252840;
+  --crm-border2:      #2E3350;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--crm-bg);
+    color: var(--crm-text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100%;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--crm-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--crm-muted2);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--crm-muted);
+  }
+
+  ::selection {
+    background: var(--crm-blue-dim);
+    color: var(--crm-blue);
+  }
+}

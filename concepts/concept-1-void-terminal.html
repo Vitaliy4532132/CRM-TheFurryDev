@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Концепт 1 — VOID TERMINAL</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#050507;--surface:#0D0D12;--s2:#141420;--s3:#1A1A28;
+    --primary:#00FF94;--accent:#FF2D6B;--warn:#FFB800;
+    --text:#F0F0F0;--muted:#4A4A5A;--border:#1C1C2A;--border2:#2A2A3C;
+  }
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:'JetBrains Mono',monospace;font-size:13px;
+    min-height:100vh;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.05) 3px,rgba(0,0,0,0.05) 4px);
+    pointer-events:none;z-index:9999;
+  }
+  @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+  @keyframes glitch{
+    0%{transform:translate(0)}20%{transform:translate(-2px,1px);filter:hue-rotate(90deg)}
+    40%{transform:translate(2px,-1px)}60%{transform:translate(-1px,2px);filter:hue-rotate(-90deg)}
+    80%{transform:translate(1px,-1px)}100%{transform:translate(0);filter:none}
+  }
+
+  /* Layout */
+  .layout{display:flex;height:100vh;overflow:hidden}
+
+  /* Sidebar */
+  .sidebar{
+    width:210px;background:var(--surface);
+    border-right:1px solid var(--border);
+    display:flex;flex-direction:column;flex-shrink:0;
+  }
+  .sidebar-logo{
+    padding:22px 18px 18px;border-bottom:1px solid var(--border);
+  }
+  .logo-tag{font-size:9px;letter-spacing:.35em;color:var(--primary);margin-bottom:4px}
+  .logo-name{font-size:14px;font-weight:800;letter-spacing:.12em;cursor:default}
+  .logo-name:hover{animation:glitch .4s linear}
+  .logo-ver{font-size:9px;color:var(--muted);margin-top:3px;letter-spacing:.06em}
+
+  .nav{flex:1;padding:10px 0}
+  .nav-item{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 18px;font-size:10px;letter-spacing:.18em;
+    color:var(--muted);cursor:pointer;
+    border-left:2px solid transparent;
+    transition:all .1s;
+  }
+  .nav-item:hover{color:var(--text);background:var(--s2)}
+  .nav-item.active{
+    color:var(--primary);background:rgba(0,255,148,.08);
+    border-left-color:var(--primary);font-weight:600;
+  }
+  .nav-cursor{margin-left:auto;animation:blink 1s step-end infinite;font-size:11px}
+  .nav-icon{font-size:13px;opacity:.8}
+
+  .sidebar-foot{
+    padding:14px 18px;border-top:1px solid var(--border);
+    font-size:9px;letter-spacing:.08em;
+  }
+  .foot-status{display:flex;align-items:center;gap:7px;margin-bottom:5px;color:var(--text)}
+  .dot{width:6px;height:6px;background:var(--primary);box-shadow:0 0 6px var(--primary);flex-shrink:0}
+  .foot-org{color:var(--muted)}
+
+  /* Main */
+  .main{flex:1;overflow-y:auto;padding:28px 32px;display:flex;flex-direction:column;gap:20px}
+
+  /* Top bar */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding-bottom:20px;border-bottom:1px solid var(--border);
+  }
+  .page-label{font-size:9px;color:var(--muted);letter-spacing:.25em;margin-bottom:5px}
+  .page-title{font-size:20px;font-weight:800;letter-spacing:.1em}
+  .topbar-right{display:flex;align-items:center;gap:12px}
+  .btn{
+    padding:8px 16px;font-size:9px;font-weight:700;
+    letter-spacing:.2em;cursor:pointer;font-family:inherit;
+    border:none;transition:all .1s;
+  }
+  .btn-primary{background:var(--primary);color:#050507}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+  .btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+
+  /* Stats row */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+  .stat{
+    background:var(--surface);padding:18px 20px;
+    border-top:2px solid var(--primary);position:relative;overflow:hidden;
+  }
+  .stat.accent{border-top-color:var(--accent)}
+  .stat.warn{border-top-color:var(--warn)}
+  .stat.muted{border-top-color:var(--border2)}
+  .stat-label{font-size:9px;letter-spacing:.22em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+  .stat-val{font-size:26px;font-weight:700;line-height:1;margin-bottom:6px;letter-spacing:-.02em}
+  .stat-sub{font-size:10px;color:var(--muted)}
+  .stat-delta{color:var(--primary);font-size:10px;font-weight:600}
+  .stat-delta.neg{color:var(--accent)}
+  .stat::after{
+    content:'';position:absolute;bottom:0;left:0;width:30%;height:1px;
+    background:var(--primary);opacity:.35;
+  }
+  .stat.accent::after{background:var(--accent)}
+  .stat.warn::after{background:var(--warn)}
+
+  /* Content grid */
+  .content{display:grid;grid-template-columns:1fr 300px;gap:1px;background:var(--border)}
+
+  /* Table panel */
+  .panel{background:var(--surface);padding:20px}
+  .panel-label{font-size:9px;letter-spacing:.22em;color:var(--muted);margin-bottom:4px}
+  .panel-title{font-size:13px;font-weight:700;letter-spacing:.08em;margin-bottom:16px}
+
+  table{width:100%;border-collapse:collapse}
+  thead tr{border-bottom:1px solid var(--border2)}
+  th{
+    padding:8px 12px;text-align:left;
+    font-size:9px;font-weight:600;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;
+  }
+  tbody tr{border-bottom:1px solid var(--border);cursor:pointer;border-left:2px solid transparent;transition:all .1s}
+  tbody tr:hover{background:var(--s2);border-left-color:var(--primary)}
+  td{padding:10px 12px;font-size:11px}
+
+  /* Badges */
+  .badge{
+    display:inline-block;padding:2px 8px;font-size:9px;font-weight:600;
+    letter-spacing:.15em;
+  }
+  .badge-green{color:var(--primary);background:rgba(0,255,148,.1);border:1px solid rgba(0,255,148,.15)}
+  .badge-red{color:var(--accent);background:rgba(255,45,107,.1);border:1px solid rgba(255,45,107,.15)}
+  .badge-yellow{color:var(--warn);background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.15)}
+  .badge-grey{color:var(--muted);background:rgba(74,74,90,.15);border:1px solid rgba(74,74,90,.2)}
+
+  /* Right panel — activity */
+  .activity{display:flex;flex-direction:column;gap:1px}
+  .act-item{
+    background:var(--s2);padding:12px 14px;
+    border-left:2px solid transparent;transition:all .1s;cursor:pointer;
+  }
+  .act-item:hover{border-left-color:var(--primary);background:var(--s3)}
+  .act-item.new{border-left-color:var(--primary)}
+  .act-name{font-size:11px;font-weight:500;margin-bottom:3px}
+  .act-meta{font-size:9px;color:var(--muted);letter-spacing:.06em}
+  .act-amount{font-size:12px;font-weight:700;color:var(--primary);margin-top:4px}
+  .act-amount.neg{color:var(--accent)}
+
+  /* Progress bar */
+  .prog-bar{width:60px;height:3px;background:var(--s3);position:relative;display:inline-block}
+  .prog-fill{position:absolute;left:0;top:0;height:100%;background:var(--primary)}
+  .prog-fill.done{background:var(--muted)}
+  .prog-fill.cancel{background:var(--accent)}
+
+  /* Concept label */
+  .concept-tag{
+    position:fixed;bottom:20px;right:20px;
+    font-size:9px;letter-spacing:.2em;color:var(--muted);
+    border:1px solid var(--border2);padding:6px 12px;
+    background:var(--surface);z-index:100;
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-tag">FURRYPANEL //</div>
+      <div class="logo-name">CRM SYSTEM</div>
+      <div class="logo-ver">v0.1.0 — VOID TERMINAL</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active"><span class="nav-icon">◈</span> DASHBOARD <span class="nav-cursor">█</span></div>
+      <div class="nav-item"><span class="nav-icon">◉</span> CLIENTS</div>
+      <div class="nav-item"><span class="nav-icon">◫</span> ORDERS</div>
+      <div class="nav-item"><span class="nav-icon">◎</span> FINANCES</div>
+      <div class="nav-item"><span class="nav-icon">◧</span> SERVICES</div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="foot-status"><span class="dot"></span> ADMIN &nbsp;<span style="color:var(--primary);margin-left:auto">● ONLINE</span></div>
+      <div class="foot-org">THEFURRYDEV STUDIO</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div>
+        <div class="page-label">// ОБЗОР СИСТЕМЫ</div>
+        <div class="page-title">DASHBOARD</div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-ghost">ЭКСПОРТ</button>
+        <button class="btn btn-primary">+ НОВЫЙ ЗАКАЗ</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Клиентов</div>
+        <div class="stat-val">8</div>
+        <div class="stat-sub"><span class="stat-delta">↑ +2</span> за месяц</div>
+      </div>
+      <div class="stat warn">
+        <div class="stat-label">Активных заказов</div>
+        <div class="stat-val">5</div>
+        <div class="stat-sub"><span class="stat-delta" style="color:var(--warn)">↑ +1</span> за неделю</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Доход / апрель</div>
+        <div class="stat-val">52 500 ₽</div>
+        <div class="stat-sub"><span class="stat-delta">↑ 19%</span></div>
+      </div>
+      <div class="stat accent">
+        <div class="stat-label">Расход / апрель</div>
+        <div class="stat-val">8 300 ₽</div>
+        <div class="stat-sub"><span class="stat-delta neg">↑ 6%</span></div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- Table -->
+      <div class="panel">
+        <div class="panel-label">// ПОСЛЕДНИЕ</div>
+        <div class="panel-title">ЗАКАЗЫ</div>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>КЛИЕНТ</th><th>УСЛУГА</th><th>СУММА</th><th>СТАТУС</th><th>ПРОГРЕСС</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--primary);font-weight:600">ORD-0082</td>
+              <td>Sasha Pixel</td>
+              <td style="color:var(--muted)">Custom Map — City</td>
+              <td style="font-weight:600">25 000 ₽</td>
+              <td><span class="badge badge-green">В РАБОТЕ</span></td>
+              <td><div class="prog-bar"><div class="prog-fill" style="width:62%"></div></div></td>
+            </tr>
+            <tr>
+              <td style="color:var(--primary);font-weight:600">ORD-0083</td>
+              <td>Maria Chen</td>
+              <td style="color:var(--muted)">Discord Bot</td>
+              <td style="font-weight:600">12 000 ₽</td>
+              <td><span class="badge badge-yellow">ПРОВЕРКА</span></td>
+              <td><div class="prog-bar"><div class="prog-fill" style="width:90%"></div></div></td>
+            </tr>
+            <tr>
+              <td style="color:var(--primary);font-weight:600">ORD-0085</td>
+              <td>Lena Storm</td>
+              <td style="color:var(--muted)">Skin Pack × 20</td>
+              <td style="font-weight:600">8 500 ₽</td>
+              <td><span class="badge badge-yellow">НОВЫЙ</span></td>
+              <td><div class="prog-bar"><div class="prog-fill" style="width:0%"></div></div></td>
+            </tr>
+            <tr>
+              <td style="color:var(--primary);font-weight:600">ORD-0081</td>
+              <td>Alex Volkov</td>
+              <td style="color:var(--muted)">PvP Plugin Suite</td>
+              <td style="font-weight:600">18 000 ₽</td>
+              <td><span class="badge badge-grey">ГОТОВО</span></td>
+              <td><div class="prog-bar"><div class="prog-fill done" style="width:100%"></div></div></td>
+            </tr>
+            <tr>
+              <td style="color:var(--primary);font-weight:600">ORD-0088</td>
+              <td>Ivan Kuznetsov</td>
+              <td style="color:var(--muted)">Map — Arena</td>
+              <td style="font-weight:600">5 000 ₽</td>
+              <td><span class="badge badge-red">ОТМЕНЁН</span></td>
+              <td><div class="prog-bar"><div class="prog-fill cancel" style="width:100%"></div></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Activity -->
+      <div class="panel" style="padding:20px 0">
+        <div style="padding:0 20px 16px">
+          <div class="panel-label">// АКТИВНОСТЬ</div>
+          <div class="panel-title">ТРАНЗАКЦИИ</div>
+        </div>
+        <div class="activity">
+          <div class="act-item new">
+            <div class="act-name">Discord Bot</div>
+            <div class="act-meta">ORD-0083 — 25.04.2024</div>
+            <div class="act-amount">+12 000 ₽</div>
+          </div>
+          <div class="act-item">
+            <div class="act-name">PvP Plugin Suite</div>
+            <div class="act-meta">ORD-0081 — 14.04.2024</div>
+            <div class="act-amount">+18 000 ₽</div>
+          </div>
+          <div class="act-item">
+            <div class="act-name">Фриланс // Художник</div>
+            <div class="act-meta">РАСХОД — 20.04.2024</div>
+            <div class="act-amount neg">-5 000 ₽</div>
+          </div>
+          <div class="act-item">
+            <div class="act-name">Server Config</div>
+            <div class="act-meta">ORD-0084 — 08.04.2024</div>
+            <div class="act-amount">+5 000 ₽</div>
+          </div>
+          <div class="act-item">
+            <div class="act-name">Adobe CC</div>
+            <div class="act-meta">РАСХОД — 01.04.2024</div>
+            <div class="act-amount neg">-2 500 ₽</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="concept-tag">КОНЦЕПТ 1 // VOID TERMINAL</div>
+
+</body>
+</html>

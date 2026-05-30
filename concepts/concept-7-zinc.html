@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Концепт 7 — ZINC</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600;700&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0C0C0C;--surface:#141414;--s2:#1C1C1C;--s3:#242424;
+  --lime:#CAFF00;--lime-dim:rgba(202,255,0,.1);--lime-glow:rgba(202,255,0,.15);
+  --text:#F5F5F5;--muted:#555;--muted2:#333;
+  --border:#1F1F1F;--border2:#2A2A2A;
+}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Geist',sans-serif;font-size:14px;min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.layout{display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+.sidebar{
+  width:220px;flex-shrink:0;background:var(--surface);
+  border-right:1px solid var(--border2);display:flex;flex-direction:column;
+}
+.logo-area{
+  padding:24px 20px;border-bottom:1px solid var(--border2);
+  display:flex;align-items:center;gap:12px;
+}
+.logo-dot{
+  width:10px;height:10px;background:var(--lime);
+  box-shadow:0 0 12px var(--lime-glow);flex-shrink:0;
+}
+.logo-name{font-size:14px;font-weight:600;color:var(--text);letter-spacing:.02em}
+.logo-ver{font-size:10px;color:var(--muted);margin-top:1px;font-family:'Geist Mono',monospace}
+
+nav{flex:1;padding:12px;overflow-y:auto}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:6px;cursor:pointer;
+  font-size:13px;font-weight:400;color:var(--muted);
+  transition:all .12s;margin-bottom:1px;letter-spacing:.01em;
+}
+.nav-item:hover{background:var(--s2);color:var(--text)}
+.nav-item.active{
+  background:var(--lime-dim);color:var(--lime);font-weight:500;
+}
+.nav-count{
+  margin-left:auto;font-size:11px;
+  font-family:'Geist Mono',monospace;color:var(--muted);
+}
+.nav-item.active .nav-count{color:var(--lime);opacity:.7}
+
+.sidebar-foot{
+  padding:12px;border-top:1px solid var(--border2);
+}
+.user-row{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 10px;border-radius:6px;background:var(--s2);
+}
+.ava{
+  width:28px;height:28px;border-radius:4px;
+  background:var(--lime);display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:#0C0C0C;flex-shrink:0;
+  font-family:'Geist Mono',monospace;
+}
+.uname{font-size:12px;font-weight:500;color:var(--text)}
+.urole{font-size:10px;color:var(--muted)}
+.u-live{
+  margin-left:auto;font-size:10px;font-weight:600;
+  color:var(--lime);font-family:'Geist Mono',monospace;
+  letter-spacing:.06em;
+}
+
+/* Main */
+.main{flex:1;overflow-y:auto;padding:28px 32px;display:flex;flex-direction:column;gap:18px}
+
+.topbar{display:flex;align-items:center;justify-content:space-between}
+.pg-over{font-size:11px;color:var(--muted);margin-bottom:4px;font-family:'Geist Mono',monospace;letter-spacing:.04em}
+.pg-title{font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--text)}
+.topbar-r{display:flex;gap:8px}
+.btn{
+  padding:8px 18px;border-radius:6px;font-size:13px;font-weight:500;
+  cursor:pointer;font-family:'Geist',sans-serif;border:none;transition:all .12s;
+}
+.btn-lime{background:var(--lime);color:#0C0C0C;font-weight:600}
+.btn-lime:hover{filter:brightness(1.05)}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:var(--muted2)}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:8px;padding:16px 18px;cursor:default;
+  transition:border-color .15s;
+}
+.stat:hover{border-color:var(--muted2)}
+.stat-label{font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:400;letter-spacing:.02em}
+.stat-val{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px}
+.stat-foot{display:flex;align-items:center;gap:6px}
+.stat-d{font-size:11px;font-weight:500;font-family:'Geist Mono',monospace}
+.d-up{color:var(--lime)}
+.d-dn{color:#FF6B6B}
+.stat-s{font-size:11px;color:var(--muted)}
+
+/* Divider */
+.section-label{
+  font-size:10px;font-weight:500;letter-spacing:.1em;color:var(--muted);
+  text-transform:uppercase;font-family:'Geist Mono',monospace;
+  display:flex;align-items:center;gap:12px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border2)}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:1fr 290px;gap:10px}
+.panel{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:18px}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.pt{font-size:13px;font-weight:600;letter-spacing:-.01em}
+.pa{
+  font-size:11px;color:var(--muted);cursor:pointer;
+  font-family:'Geist Mono',monospace;letter-spacing:.03em;
+  transition:.12s;
+}
+.pa:hover{color:var(--lime)}
+
+table{width:100%;border-collapse:collapse}
+th{
+  padding:8px 10px;text-align:left;font-size:10px;
+  color:var(--muted);font-weight:500;letter-spacing:.06em;
+  border-bottom:1px solid var(--border2);text-transform:uppercase;
+  font-family:'Geist Mono',monospace;
+}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover td{background:var(--s2)}
+td{padding:10px 10px;font-size:13px;border-bottom:1px solid var(--border);color:var(--text)}
+
+.badge{
+  display:inline-block;padding:2px 8px;border-radius:4px;
+  font-size:10px;font-weight:500;font-family:'Geist Mono',monospace;
+  letter-spacing:.04em;
+}
+.b-g{color:var(--lime);background:var(--lime-dim)}
+.b-b{color:#60A5FA;background:rgba(96,165,250,.1)}
+.b-y{color:#FCD34D;background:rgba(252,211,77,.08)}
+.b-m{color:var(--muted);background:var(--s3)}
+.b-r{color:#FF6B6B;background:rgba(255,107,107,.1)}
+
+.prog{width:60px;height:3px;background:var(--s3);border-radius:2px;overflow:hidden;display:inline-block}
+.pf{height:100%;background:var(--lime);border-radius:2px}
+.pf.g{background:var(--muted2)}
+.pf.r{background:#FF6B6B}
+
+/* Activity */
+.acts{display:flex;flex-direction:column}
+.act{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;
+  transition:.12s;
+}
+.act:last-child{border-bottom:none}
+.act:hover .act-name{color:var(--lime)}
+.act-mark{width:3px;height:3px;border-radius:50%;flex-shrink:0}
+.act-mark.inc{background:var(--lime)}
+.act-mark.exp{background:#FF6B6B}
+.act-name{font-size:12px;font-weight:500;transition:.12s;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.act-date{font-size:10px;color:var(--muted);font-family:'Geist Mono',monospace}
+.act-sum{
+  margin-left:auto;font-size:12px;font-weight:600;
+  font-family:'Geist Mono',monospace;white-space:nowrap;
+}
+.act-sum.inc{color:var(--lime)}
+.act-sum.exp{color:#FF6B6B}
+
+.concept-tag{
+  position:fixed;bottom:20px;right:20px;z-index:100;
+  font-size:10px;color:var(--lime);
+  background:var(--s2);border:1px solid var(--border2);
+  padding:6px 12px;border-radius:4px;
+  font-family:'Geist Mono',monospace;letter-spacing:.06em;
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo-area">
+      <div class="logo-dot"></div>
+      <div>
+        <div class="logo-name">FurryPanel</div>
+        <div class="logo-ver">crm/v0.1.0</div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-item active">⊞ Dashboard</div>
+      <div class="nav-item">◎ Клиенты <span class="nav-count">08</span></div>
+      <div class="nav-item">◻ Заказы <span class="nav-count">05</span></div>
+      <div class="nav-item">◈ Финансы</div>
+      <div class="nav-item">◧ Услуги</div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-row">
+        <div class="ava">AD</div>
+        <div><div class="uname">Admin</div><div class="urole">TheFurryDev</div></div>
+        <div class="u-live">ON</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="pg-over">// апрель 2024</div>
+        <div class="pg-title">Dashboard</div>
+      </div>
+      <div class="topbar-r">
+        <button class="btn btn-ghost">Экспорт</button>
+        <button class="btn btn-lime">+ Новый заказ</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Клиентов</div>
+        <div class="stat-val">8</div>
+        <div class="stat-foot"><span class="stat-d d-up">+2</span><span class="stat-s">за месяц</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Активных заказов</div>
+        <div class="stat-val">5</div>
+        <div class="stat-foot"><span class="stat-d d-up">+1</span><span class="stat-s">за неделю</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Доход / апрель</div>
+        <div class="stat-val">52 500 ₽</div>
+        <div class="stat-foot"><span class="stat-d d-up">+19%</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Расход / апрель</div>
+        <div class="stat-val">8 300 ₽</div>
+        <div class="stat-foot"><span class="stat-d d-dn">+6%</span></div>
+      </div>
+    </div>
+
+    <div class="section-label">Последние заказы</div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="ph"><div class="pt">Заказы</div><div class="pa">все →</div></div>
+        <table>
+          <thead><tr><th>ID</th><th>Клиент</th><th>Услуга</th><th>Сумма</th><th>Статус</th><th>%</th></tr></thead>
+          <tbody>
+            <tr><td style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--lime)">ORD-0082</td><td>Sasha Pixel</td><td style="color:var(--muted)">Custom Map</td><td style="font-weight:600">25 000 ₽</td><td><span class="badge b-g">В работе</span></td><td><div class="prog"><div class="pf" style="width:62%"></div></div></td></tr>
+            <tr><td style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--lime)">ORD-0083</td><td>Maria Chen</td><td style="color:var(--muted)">Discord Bot</td><td style="font-weight:600">12 000 ₽</td><td><span class="badge b-b">Проверка</span></td><td><div class="prog"><div class="pf" style="width:90%"></div></div></td></tr>
+            <tr><td style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--lime)">ORD-0085</td><td>Lena Storm</td><td style="color:var(--muted)">Skin Pack ×20</td><td style="font-weight:600">8 500 ₽</td><td><span class="badge b-y">Новый</span></td><td><div class="prog"><div class="pf" style="width:0%"></div></div></td></tr>
+            <tr><td style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--lime)">ORD-0081</td><td>Alex Volkov</td><td style="color:var(--muted)">PvP Plugin</td><td style="font-weight:600">18 000 ₽</td><td><span class="badge b-m">Готово</span></td><td><div class="prog"><div class="pf g" style="width:100%"></div></div></td></tr>
+            <tr><td style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--lime)">ORD-0088</td><td>Ivan K.</td><td style="color:var(--muted)">Map — Arena</td><td style="font-weight:600">5 000 ₽</td><td><span class="badge b-r">Отменён</span></td><td><div class="prog"><div class="pf r" style="width:100%"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="ph"><div class="pt">Транзакции</div><div class="pa">все →</div></div>
+        <div class="acts">
+          <div class="act"><div class="act-mark inc"></div><div style="flex:1;min-width:0"><div class="act-name">Discord Bot</div><div class="act-date">25.04.2024</div></div><div class="act-sum inc">+12 000 ₽</div></div>
+          <div class="act"><div class="act-mark inc"></div><div style="flex:1;min-width:0"><div class="act-name">PvP Plugin Suite</div><div class="act-date">14.04.2024</div></div><div class="act-sum inc">+18 000 ₽</div></div>
+          <div class="act"><div class="act-mark exp"></div><div style="flex:1;min-width:0"><div class="act-name">Фриланс</div><div class="act-date">20.04.2024</div></div><div class="act-sum exp">-5 000 ₽</div></div>
+          <div class="act"><div class="act-mark inc"></div><div style="flex:1;min-width:0"><div class="act-name">Server Config</div><div class="act-date">08.04.2024</div></div><div class="act-sum inc">+5 000 ₽</div></div>
+          <div class="act"><div class="act-mark exp"></div><div style="flex:1;min-width:0"><div class="act-name">Adobe CC</div><div class="act-date">01.04.2024</div></div><div class="act-sum exp">-2 500 ₽</div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="concept-tag">КОНЦЕПТ 7 — ZINC</div>
+</body>
+</html>
