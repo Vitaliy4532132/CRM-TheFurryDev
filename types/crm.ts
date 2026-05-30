@@ -128,30 +128,38 @@ export interface CRMExpense {
   created_at: string
 }
 
-// ─── service_orders (existing FurryDev table — used as CRM Requests) ─────────
+// ─── CRM Requests (manual, created inside CRM) ───────────────────────────────
+
+export type RequestSource = 'telegram' | 'discord' | 'site' | 'other'
+export type RequestStatus = 'new' | 'in_progress' | 'waiting' | 'converted' | 'rejected'
+
+export interface CRMRequest {
+  id:          string
+  name:        string
+  telegram:    string | null
+  discord:     string | null
+  source:      RequestSource
+  service:     string | null
+  budget:      number
+  description: string | null
+  status:      RequestStatus
+  created_at:  string
+}
+
+// ─── ServiceOrder kept for legacy reference only — no longer used ─────────────
 
 export interface ServiceOrder {
-  id:             string
-  order_number:   number | null
-  service_type:   string | null
-  service_title:  string | null
-  telegram:       string | null
-  discord:        string | null
-  source:         string | null
-  budget:         string | null        // текст вида "500 – 2 000₽"
-  budget_int:     number | null        // числовой бюджет
-  description:    string | null
-  details:        Record<string, string> | null
-  status:         string               // 'new' | 'in_progress' | 'done' | ...
-  progress:       number
-  payment_status: string | null
-  stage:          string | null
-  deadline:       string | null
-  deadline_at:    string | null
-  unread_count:   number
-  user_id:        string | null
-  viewed_at:      string | null
-  created_at:     string
+  id:            string
+  order_number:  number | null
+  service_title: string | null
+  telegram:      string | null
+  discord:       string | null
+  source:        string | null
+  budget:        string | null
+  budget_int:    number | null
+  description:   string | null
+  status:        string
+  created_at:    string
 }
 
 // ─── Dashboard stats ─────────────────────────────────────────────────────────

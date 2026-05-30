@@ -2,33 +2,16 @@
 
 import { X, Send, MessageSquare, UserPlus } from 'lucide-react'
 import { useEffect } from 'react'
-import type { ServiceOrder } from '@/types/crm'
+import type { CRMRequest } from '@/types/crm'
 import { formatDate } from '@/lib/crm/helpers'
 
-// ── Legacy type kept for backward compatibility ──────────────────────────────
-
-export interface RequestItem {
-  id: string
-  name: string
-  contact: string
-  source: string
-  service: string
-  budget: string
-  status: string
-  date: string
-  description?: string
-}
-
-// ── Real props ────────────────────────────────────────────────────────────────
-
 interface ViewRequestModalProps {
-  request: ServiceOrder | null
-  onClose: () => void
-  onConvert: () => void
+  request:      CRMRequest | null
+  displayNum:   number
+  onClose:      () => void
+  onConvert:    () => void
   onStatusChange: (id: string, status: string) => void
 }
-
-// ── Status / source display ───────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, string> = {
   new:         'Новая',
@@ -36,8 +19,6 @@ const STATUS_LABELS: Record<string, string> = {
   waiting:     'Ожидает ответа',
   converted:   'Конвертирована',
   rejected:    'Отклонена',
-  done:        'Выполнена',
-  discussion:  'В обсуждении',
 }
 
 const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
@@ -46,27 +27,26 @@ const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
   waiting:     { color: 'var(--crm-orange)', bg: 'var(--crm-orange-dim)' },
   converted:   { color: 'var(--crm-green)',  bg: 'var(--crm-green-dim)' },
   rejected:    { color: 'var(--crm-red)',    bg: 'var(--crm-red-dim)' },
-  done:        { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
-  discussion:  { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  website:  'Сайт',
   telegram: 'Telegram',
   discord:  'Discord',
+  site:     'Сайт',
+  other:    'Другое',
 }
 
 const SOURCE_COLORS: Record<string, { color: string; bg: string }> = {
-  website:  { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
   telegram: { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
   discord:  { color: 'var(--crm-purple)', bg: 'var(--crm-purple-dim)' },
+  site:     { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
+  other:    { color: 'var(--crm-muted)',  bg: 'rgba(100,116,139,0.12)' },
 }
 
-function Badge({ text, colorMap }: { text: string; colorMap: Record<string, { color: string; bg: string }> }) {
-  const cfg = colorMap[text] ?? { color: 'var(--crm-muted)', bg: 'rgba(100,116,139,0.12)' }
+function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
-    <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,color:cfg.color,background:cfg.bg,whiteSpace:'nowrap' }}>
-      {text}
+    <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,color,background:bg,whiteSpace:'nowrap' }}>
+      {label}
     </span>
   )
 }
@@ -80,7 +60,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
-export function ViewRequestModal({ request, onClose, onConvert, onStatusChange }: ViewRequestModalProps) {
+export function ViewRequestModal({ request, displayNum, onClose, onConvert, onStatusChange }: ViewRequestModalProps) {
   useEffect(() => {
     if (!request) return
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -90,17 +70,16 @@ export function ViewRequestModal({ request, onClose, onConvert, onStatusChange }
 
   if (!request) return null
 
-  const statusLabel = STATUS_LABELS[request.status] ?? request.status
-  const sourceKey   = (request.source ?? 'website').toLowerCase()
-  const sourceLabel = SOURCE_LABELS[sourceKey] ?? request.source ?? 'Сайт'
-  const telegram    = request.telegram ? `@${request.telegram}` : null
-  const discord     = request.discord || null
-  const budget      = request.budget || (request.budget_int ? `${request.budget_int} ₽` : null)
+  const statusCfg = STATUS_COLORS[request.status] ?? { color:'var(--crm-muted)',bg:'rgba(100,116,139,0.12)' }
+  const sourceCfg = SOURCE_COLORS[request.source] ?? SOURCE_COLORS.other
+  const sourceLabel = SOURCE_LABELS[request.source] ?? request.source
+  const telegram = request.telegram ? (request.telegram.startsWith('@') ? request.telegram : `@${request.telegram}`) : null
+  const discord  = request.discord  || null
 
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={(e) => { if (e.target===e.currentTarget) onClose() }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{ width:480,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 
@@ -108,9 +87,9 @@ export function ViewRequestModal({ request, onClose, onConvert, onStatusChange }
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid var(--crm-border2)',flexShrink:0 }}>
           <div style={{ display:'flex',alignItems:'center',gap:10 }}>
             <span style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)' }}>
-              Заявка #{request.order_number}
+              Заявка #{displayNum} — {request.name}
             </span>
-            <Badge text={statusLabel} colorMap={STATUS_COLORS}/>
+            <Badge label={STATUS_LABELS[request.status] ?? request.status} color={statusCfg.color} bg={statusCfg.bg}/>
           </div>
           <button onClick={onClose} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)';e.currentTarget.style.color='var(--crm-red)'}}
@@ -138,17 +117,19 @@ export function ViewRequestModal({ request, onClose, onConvert, onStatusChange }
             {!telegram && !discord && (
               <span style={{ fontSize:13,color:'var(--crm-muted)' }}>Контакт не указан</span>
             )}
-            <Badge text={sourceLabel} colorMap={SOURCE_COLORS}/>
+            <Badge label={sourceLabel} color={sourceCfg.color} bg={sourceCfg.bg}/>
           </div>
 
           {/* Details */}
           <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:14 }}>
-            <Row label="Услуга">{request.service_title ?? '—'}</Row>
+            <Row label="Услуга">{request.service ?? '—'}</Row>
             <Row label="Бюджет">
-              <span style={{ fontWeight:700,color:'var(--crm-blue)' }}>{budget ?? '—'}</span>
+              <span style={{ fontWeight:700,color:'var(--crm-blue)' }}>
+                {request.budget > 0 ? `${request.budget.toLocaleString('ru-RU')} ₽` : '—'}
+              </span>
             </Row>
             <Row label="Дата заявки">{formatDate(request.created_at)}</Row>
-            <Row label="Источник"><Badge text={sourceLabel} colorMap={SOURCE_COLORS}/></Row>
+            <Row label="Источник"><Badge label={sourceLabel} color={sourceCfg.color} bg={sourceCfg.bg}/></Row>
           </div>
 
           {/* Description */}

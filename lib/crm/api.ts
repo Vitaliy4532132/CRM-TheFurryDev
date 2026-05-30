@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type {
   CRMClient, CRMOrder, CRMPayment,
-  CRMExpense, CRMService, ServiceOrder,
+  CRMExpense, CRMService, CRMRequest,
   DashboardStats,
 } from '@/types/crm'
 
@@ -293,16 +293,53 @@ export async function deleteCRMExpense(id: string): Promise<void> {
   if (error) throw error
 }
 
-// ─── REQUESTS (service_orders) ───────────────────────────────────────────────
+// ─── REQUESTS (crm_requests) ─────────────────────────────────────────────────
 
-export async function getRequests(): Promise<ServiceOrder[]> {
+export async function getRequests(): Promise<CRMRequest[]> {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from('service_orders')
+    .from('crm_requests')
     .select('*')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return (data ?? []) as ServiceOrder[]
+  return data ?? []
+}
+
+export async function createRequest(
+  input: Omit<CRMRequest, 'id' | 'created_at'>,
+): Promise<CRMRequest> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('crm_requests')
+    .insert(input)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateRequest(
+  id: string,
+  input: Partial<Omit<CRMRequest, 'id' | 'created_at'>>,
+): Promise<CRMRequest> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('crm_requests')
+    .update(input)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteRequest(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('crm_requests')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function updateRequestStatus(
@@ -311,7 +348,7 @@ export async function updateRequestStatus(
 ): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase
-    .from('service_orders')
+    .from('crm_requests')
     .update({ status })
     .eq('id', id)
   if (error) throw error

@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Search, Eye, UserPlus, Inbox, BellRing, Clock, UserCheck } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Search, Eye, UserPlus, Inbox, BellRing, Clock, UserCheck, Plus, Pencil, Trash2 } from 'lucide-react'
 import { StatCard } from '@/components/crm/stat-card'
-import { ViewRequestModal } from '@/components/crm/modals/view-request-modal'
+import { ViewRequestModal }    from '@/components/crm/modals/view-request-modal'
 import { ConvertRequestModal } from '@/components/crm/modals/convert-request-modal'
-import { getRequests, getClients, getServices, updateRequestStatus } from '@/lib/crm/api'
-import { formatDate } from '@/lib/crm/helpers'
-import type { ServiceOrder, CRMClient, CRMService } from '@/types/crm'
+import { CreateRequestModal }  from '@/components/crm/modals/create-request-modal'
+import { EditRequestModal }    from '@/components/crm/modals/edit-request-modal'
+import { getRequests, getClients, getServices, updateRequestStatus, deleteRequest } from '@/lib/crm/api'
+import { formatDate, formatMoney } from '@/lib/crm/helpers'
+import type { CRMRequest, CRMClient, CRMService } from '@/types/crm'
 
-// ── Status / source display ───────────────────────────────────────────────────
+// ── Badges ────────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, string> = {
   new:         'Новая',
@@ -17,31 +19,25 @@ const STATUS_LABELS: Record<string, string> = {
   waiting:     'Ожидает ответа',
   converted:   'Конвертирована',
   rejected:    'Отклонена',
-  done:        'Выполнена',
-  discussion:  'В обсуждении',
 }
-
 const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
   new:         { color: 'var(--crm-purple)', bg: 'var(--crm-purple-dim)' },
   in_progress: { color: 'var(--crm-yellow)', bg: 'var(--crm-yellow-dim)' },
   waiting:     { color: 'var(--crm-orange)', bg: 'var(--crm-orange-dim)' },
   converted:   { color: 'var(--crm-green)',  bg: 'var(--crm-green-dim)' },
   rejected:    { color: 'var(--crm-red)',    bg: 'var(--crm-red-dim)' },
-  done:        { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
-  discussion:  { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
 }
-
 const SOURCE_LABELS: Record<string, string> = {
-  website:  'Сайт',
   telegram: 'Telegram',
   discord:  'Discord',
+  site:     'Сайт',
+  other:    'Другое',
 }
-
 const SOURCE_COLORS: Record<string, { color: string; bg: string }> = {
-  'Сайт':     { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
-  'Telegram': { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
-  'Discord':  { color: 'var(--crm-purple)', bg: 'var(--crm-purple-dim)' },
-  'Другое':   { color: 'var(--crm-muted)',  bg: 'rgba(100,116,139,0.12)' },
+  telegram: { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
+  discord:  { color: 'var(--crm-purple)', bg: 'var(--crm-purple-dim)' },
+  site:     { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
+  other:    { color: 'var(--crm-muted)',  bg: 'rgba(100,116,139,0.12)' },
 }
 
 function Badge({ text, colorMap }: { text: string; colorMap: Record<string, { color: string; bg: string }> }) {
@@ -49,7 +45,7 @@ function Badge({ text, colorMap }: { text: string; colorMap: Record<string, { co
   return <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:cfg.color,background:cfg.bg }}>{text}</span>
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
+// ── Skeletons ─────────────────────────────────────────────────────────────────
 
 function StatSkel() {
   return (
@@ -63,14 +59,14 @@ function StatSkel() {
 function SkeletonRow() {
   return (
     <tr style={{ borderBottom:'1px solid var(--crm-border)' }}>
-      {[40,100,110,70,100,70,70,80].map((w,i)=>(
+      {[36,80,110,90,80,70,70,80].map((w,i)=>(
         <td key={i} style={{ padding:'12px 14px' }}>
           <div style={{ height:13,width:w,background:'var(--crm-s3)',borderRadius:6,animation:'crm-pulse 1.5s ease-in-out infinite' }}/>
         </td>
       ))}
       <td style={{ padding:'12px 14px' }}>
         <div style={{ display:'flex',justifyContent:'flex-end',gap:6 }}>
-          {[0,1].map(i=><div key={i} style={{ width:28,height:28,borderRadius:6,background:'var(--crm-s3)',animation:'crm-pulse 1.5s ease-in-out infinite' }}/>)}
+          {[0,1,2].map(i=><div key={i} style={{ width:28,height:28,borderRadius:6,background:'var(--crm-s3)',animation:'crm-pulse 1.5s ease-in-out infinite' }}/>)}
         </div>
       </td>
     </tr>
@@ -79,14 +75,20 @@ function SkeletonRow() {
 
 // ── ActionButton ──────────────────────────────────────────────────────────────
 
-function ActionButton({ icon:Icon, title, hoverColor, onClick, disabled }: {
-  icon: typeof Eye; title: string; hoverColor?: 'green'; onClick?: () => void; disabled?: boolean
+function ActionBtn({ icon:Icon, title, variant, onClick, disabled }: {
+  icon: typeof Eye; title: string
+  variant?: 'green' | 'blue' | 'red'
+  onClick?: () => void; disabled?: boolean
 }) {
-  const bgHover   = hoverColor === 'green' ? 'var(--crm-green-dim)' : 'var(--crm-border2)'
-  const textHover = hoverColor === 'green' ? 'var(--crm-green)'     : 'var(--crm-text)'
+  const map = {
+    green: { bg: 'var(--crm-green-dim)',  color: 'var(--crm-green)' },
+    blue:  { bg: 'var(--crm-blue-dim)',   color: 'var(--crm-blue)' },
+    red:   { bg: 'var(--crm-red-dim)',    color: 'var(--crm-red)' },
+  }
+  const h = variant ? map[variant] : { bg:'var(--crm-border2)', color:'var(--crm-text)' }
   return (
     <button title={title} onClick={onClick} disabled={disabled} style={{ width:28,height:28,borderRadius:6,background:'var(--crm-s3)',border:'none',cursor:disabled?'default':'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s',flexShrink:0,opacity:disabled?0.4:1 }}
-      onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background=bgHover;e.currentTarget.style.color=textHover}}}
+      onMouseEnter={e=>{if(!disabled){e.currentTarget.style.background=h.bg;e.currentTarget.style.color=h.color}}}
       onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
       <Icon size={13} strokeWidth={1.75}/>
     </button>
@@ -101,7 +103,6 @@ const thStyle: React.CSSProperties = {
   color:'var(--crm-muted)', textTransform:'uppercase',
   borderBottom:'1px solid var(--crm-border2)', whiteSpace:'nowrap',
 }
-
 const inputBase: React.CSSProperties = {
   height:38, background:'var(--crm-surface)',
   border:'1px solid var(--crm-border2)', borderRadius:8,
@@ -112,22 +113,25 @@ const inputBase: React.CSSProperties = {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RequestsPage() {
-  const [requests,       setRequests]       = useState<ServiceOrder[]>([])
+  const [requests,       setRequests]       = useState<CRMRequest[]>([])
   const [clients,        setClients]        = useState<CRMClient[]>([])
   const [services,       setServices]       = useState<CRMService[]>([])
   const [loading,        setLoading]        = useState(true)
-  const [viewRequest,    setViewRequest]    = useState<ServiceOrder | null>(null)
-  const [convertRequest, setConvertRequest] = useState<ServiceOrder | null>(null)
+  const [viewRequest,    setViewRequest]    = useState<CRMRequest | null>(null)
+  const [convertRequest, setConvertRequest] = useState<CRMRequest | null>(null)
+  const [editRequest,    setEditRequest]    = useState<CRMRequest | null>(null)
+  const [createOpen,     setCreateOpen]     = useState(false)
   const [search,         setSearch]         = useState('')
   const [statusFilter,   setStatusFilter]   = useState('')
   const [sourceFilter,   setSourceFilter]   = useState('')
+
+  // ── Load ──────────────────────────────────────────────────────────────────
 
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
       const [r, c, s] = await Promise.all([getRequests(), getClients(), getServices()])
-      setRequests(r as ServiceOrder[])
-      setClients(c); setServices(s)
+      setRequests(r); setClients(c); setServices(s)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [])
@@ -138,37 +142,60 @@ export default function RequestsPage() {
     const c = await getClients(); setClients(c)
   }, [])
 
-  // ── Статус заявки ──────────────────────────────────────────────────────────
+  // ── Stable display numbers (oldest = #1) ─────────────────────────────────
+
+  const numbersMap = useMemo(() => {
+    const map = new Map<string, number>()
+    const sorted = [...requests].sort((a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )
+    sorted.forEach((r, i) => map.set(r.id, i + 1))
+    return map
+  }, [requests])
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   async function handleStatusChange(id: string, status: string) {
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
-    setViewRequest(prev => prev?.id === id ? { ...prev, status } : prev)
+    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: status as CRMRequest['status'] } : r))
+    setViewRequest(prev => prev?.id === id ? { ...prev, status: status as CRMRequest['status'] } : prev)
     try { await updateRequestStatus(id, status) }
     catch { loadAll() }
   }
 
-  // ── Фильтрация ─────────────────────────────────────────────────────────────
+  async function handleDelete(id: string) {
+    setRequests(prev => prev.filter(r => r.id !== id))
+    try { await deleteRequest(id) }
+    catch { loadAll() }
+  }
+
+  function handleCreated(req: CRMRequest) {
+    setRequests(prev => [req, ...prev])
+  }
+
+  function handleEdited(req: CRMRequest) {
+    setRequests(prev => prev.map(r => r.id === req.id ? req : r))
+    setViewRequest(prev => prev?.id === req.id ? req : prev)
+  }
+
+  // ── Filter ────────────────────────────────────────────────────────────────
 
   const filtered = requests.filter(r => {
     if (search) {
       const q = search.toLowerCase()
-      const contact = (r.telegram ?? '') + ' ' + (r.discord ?? '')
-      if (!contact.toLowerCase().includes(q) && !(r.service_title ?? '').toLowerCase().includes(q)) return false
+      const hay = [r.name, r.telegram, r.discord, r.service].filter(Boolean).join(' ').toLowerCase()
+      if (!hay.includes(q)) return false
     }
     if (statusFilter && r.status !== statusFilter) return false
-    if (sourceFilter) {
-      const srcLabel = SOURCE_LABELS[(r.source ?? 'website').toLowerCase()] ?? 'Сайт'
-      if (srcLabel !== sourceFilter) return false
-    }
+    if (sourceFilter && r.source !== sourceFilter) return false
     return true
   })
 
-  // ── Статистика ─────────────────────────────────────────────────────────────
+  // ── Stats ─────────────────────────────────────────────────────────────────
 
-  const total       = requests.length
-  const newCount    = requests.filter(r => r.status === 'new').length
-  const inProgress  = requests.filter(r => r.status === 'in_progress' || r.status === 'discussion').length
-  const converted   = requests.filter(r => r.status === 'converted').length
+  const total      = requests.length
+  const newCount   = requests.filter(r => r.status === 'new').length
+  const inProgress = requests.filter(r => r.status === 'in_progress' || r.status === 'waiting').length
+  const converted  = requests.filter(r => r.status === 'converted').length
 
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:20 }}>
@@ -186,11 +213,11 @@ export default function RequestsPage() {
         )}
       </div>
 
-      {/* ── Filters ── */}
+      {/* ── Toolbar ── */}
       <div style={{ display:'flex',gap:10,alignItems:'center',flexWrap:'wrap' }}>
         <div style={{ position:'relative',flex:'1 1 220px',minWidth:180 }}>
           <Search size={14} style={{ position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--crm-muted)',pointerEvents:'none' }}/>
-          <input type="text" placeholder="Поиск по контакту, услуге..." value={search} onChange={e=>setSearch(e.target.value)}
+          <input type="text" placeholder="Поиск по имени, контакту, услуге..." value={search} onChange={e=>setSearch(e.target.value)}
             style={{ ...inputBase,width:'100%',paddingLeft:34,paddingRight:12,boxSizing:'border-box' }}
             onFocus={e=>{e.currentTarget.style.borderColor='var(--crm-blue)'}}
             onBlur={e=>{e.currentTarget.style.borderColor='var(--crm-border2)'}}/>
@@ -211,10 +238,16 @@ export default function RequestsPage() {
           onFocus={e=>{e.currentTarget.style.borderColor='var(--crm-blue)'}}
           onBlur={e=>{e.currentTarget.style.borderColor='var(--crm-border2)'}}>
           <option value="">Все источники</option>
-          <option>Сайт</option>
-          <option>Telegram</option>
-          <option>Discord</option>
+          <option value="telegram">Telegram</option>
+          <option value="discord">Discord</option>
+          <option value="site">Сайт</option>
+          <option value="other">Другое</option>
         </select>
+        <button onClick={()=>setCreateOpen(true)} style={{ display:'flex',alignItems:'center',gap:7,height:38,padding:'0 16px',borderRadius:8,background:'var(--crm-blue)',border:'none',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',flexShrink:0,transition:'opacity 0.15s',fontFamily:'inherit' }}
+          onMouseEnter={e=>{e.currentTarget.style.opacity='0.85'}}
+          onMouseLeave={e=>{e.currentTarget.style.opacity='1'}}>
+          <Plus size={15} strokeWidth={2.5}/>Добавить заявку
+        </button>
         <style>{`select option{background:var(--crm-s3);color:var(--crm-text)}`}</style>
       </div>
 
@@ -228,8 +261,8 @@ export default function RequestsPage() {
               <thead style={{ background:'var(--crm-s3)' }}>
                 <tr>
                   <th style={thStyle}>№</th>
+                  <th style={thStyle}>Имя / Ник</th>
                   <th style={thStyle}>Контакт</th>
-                  <th style={thStyle}>Telegram</th>
                   <th style={thStyle}>Источник</th>
                   <th style={thStyle}>Услуга</th>
                   <th style={thStyle}>Бюджет</th>
@@ -250,7 +283,7 @@ export default function RequestsPage() {
                           {search||statusFilter||sourceFilter ? 'Ничего не найдено' : 'Заявок пока нет'}
                         </div>
                         <div style={{ fontSize:13,color:'var(--crm-muted)' }}>
-                          Заявки появляются автоматически с сайта
+                          {!search && !statusFilter && !sourceFilter && 'Нажмите «Добавить заявку», чтобы создать первую'}
                         </div>
                       </div>
                     </td>
@@ -258,32 +291,35 @@ export default function RequestsPage() {
                 )}
 
                 {!loading && filtered.map((req, i) => {
-                  const srcKey   = (req.source ?? 'website').toLowerCase()
-                  const srcLabel = SOURCE_LABELS[srcKey] ?? 'Сайт'
+                  const num         = numbersMap.get(req.id) ?? '—'
                   const statusLabel = STATUS_LABELS[req.status] ?? req.status
-                  const budget   = req.budget || (req.budget_int ? `${req.budget_int} ₽` : '—')
+                  const sourceLabel = SOURCE_LABELS[req.source] ?? req.source
+                  const contact     = req.telegram
+                    ? (req.telegram.startsWith('@') ? req.telegram : `@${req.telegram}`)
+                    : req.discord || '—'
 
                   return (
-                    <tr key={req.id} style={{ borderBottom:i<filtered.length-1?'1px solid var(--crm-border)':'none',transition:'background 0.12s',cursor:'pointer' }}
+                    <tr key={req.id}
+                      style={{ borderBottom:i<filtered.length-1?'1px solid var(--crm-border)':'none',transition:'background 0.12s',cursor:'pointer' }}
                       onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
                       onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
                       <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
-                        #{req.order_number ?? '—'}
+                        #{num}
                       </td>
-                      <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:'var(--crm-text)',whiteSpace:'nowrap' }}>
-                        {req.telegram ? `@${req.telegram}` : req.discord || '—'}
+                      <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:'var(--crm-text)',whiteSpace:'nowrap',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis' }}>
+                        {req.name}
                       </td>
                       <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
-                        {req.discord || '—'}
+                        {contact}
                       </td>
                       <td style={{ padding:'12px 14px' }}>
-                        <Badge text={srcLabel} colorMap={SOURCE_COLORS}/>
+                        <Badge text={sourceLabel} colorMap={SOURCE_COLORS}/>
                       </td>
-                      <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-blue)',whiteSpace:'nowrap' }}>
-                        {req.service_title ?? '—'}
+                      <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-blue)',whiteSpace:'nowrap',maxWidth:120,overflow:'hidden',textOverflow:'ellipsis' }}>
+                        {req.service ?? '—'}
                       </td>
                       <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-text)',whiteSpace:'nowrap' }}>
-                        {budget}
+                        {req.budget > 0 ? formatMoney(req.budget) : '—'}
                       </td>
                       <td style={{ padding:'12px 14px' }}>
                         <Badge text={statusLabel} colorMap={STATUS_COLORS}/>
@@ -293,8 +329,10 @@ export default function RequestsPage() {
                       </td>
                       <td style={{ padding:'12px 14px' }}>
                         <div style={{ display:'flex',alignItems:'center',justifyContent:'flex-end',gap:6 }}>
-                          <ActionButton icon={Eye}     title="Просмотр" onClick={()=>setViewRequest(req)}/>
-                          <ActionButton icon={UserPlus} title="Конвертировать в заказ" hoverColor="green" onClick={()=>setConvertRequest(req)} disabled={req.status==='converted'}/>
+                          <ActionBtn icon={Eye}      title="Просмотр"             onClick={()=>setViewRequest(req)}/>
+                          <ActionBtn icon={Pencil}   title="Редактировать" variant="blue" onClick={()=>setEditRequest(req)}/>
+                          <ActionBtn icon={UserPlus} title="Конвертировать в заказ" variant="green" onClick={()=>setConvertRequest(req)} disabled={req.status==='converted'}/>
+                          <ActionBtn icon={Trash2}   title="Удалить" variant="red"   onClick={()=>handleDelete(req.id)} disabled={req.status==='converted'}/>
                         </div>
                       </td>
                     </tr>
@@ -315,17 +353,32 @@ export default function RequestsPage() {
       </div>
 
       {/* ── Modals ── */}
+      <CreateRequestModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={handleCreated}
+      />
+
+      <EditRequestModal
+        request={editRequest}
+        onClose={() => setEditRequest(null)}
+        onSuccess={handleEdited}
+      />
+
       <ViewRequestModal
         request={viewRequest}
+        displayNum={viewRequest ? (numbersMap.get(viewRequest.id) ?? 0) : 0}
         onClose={() => setViewRequest(null)}
         onConvert={() => { setConvertRequest(viewRequest); setViewRequest(null) }}
         onStatusChange={handleStatusChange}
       />
+
       <ConvertRequestModal
         open={convertRequest !== null}
         onClose={() => setConvertRequest(null)}
         onSuccess={() => { setConvertRequest(null); loadAll() }}
         request={convertRequest}
+        displayNum={convertRequest ? (numbersMap.get(convertRequest.id) ?? 0) : 0}
         clients={clients}
         services={services}
         onClientCreated={refreshClients}

@@ -6,15 +6,16 @@ import Link from 'next/link'
 import { createCRMClient, createCRMOrder, updateRequestStatus } from '@/lib/crm/api'
 import { ComboboxClient } from '@/components/crm/combobox-client'
 import { ORDER_STATUS_TO_DB } from '@/lib/crm/helpers'
-import type { CRMClient, CRMService, ServiceOrder } from '@/types/crm'
+import type { CRMClient, CRMService, CRMRequest } from '@/types/crm'
 
 interface ConvertRequestModalProps {
-  open: boolean
-  onClose: () => void
-  onSuccess: () => void
-  request: ServiceOrder | null
-  clients: CRMClient[]
-  services: CRMService[]
+  open:            boolean
+  onClose:         () => void
+  onSuccess:       () => void
+  request:         CRMRequest | null
+  displayNum:      number
+  clients:         CRMClient[]
+  services:        CRMService[]
   onClientCreated: () => void
 }
 
@@ -38,35 +39,33 @@ const STATUSES_RU = ['Новый','В обсуждении','Ожидает оп
 
 export function ConvertRequestModal({
   open, onClose, onSuccess,
-  request, clients, services, onClientCreated,
+  request, displayNum, clients, services, onClientCreated,
 }: ConvertRequestModalProps) {
-  const [clientId,    setClientId]    = useState<string | null>(null)
-  const [serviceId,   setServiceId]   = useState('')
-  const [projectName, setProjectName] = useState('')
-  const [amount,      setAmount]      = useState('')
-  const [deadline,    setDeadline]    = useState('')
-  const [statusRu,    setStatusRu]    = useState('Новый')
-  const [comment,     setComment]     = useState('')
-  const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState<string | null>(null)
+  const [clientId,       setClientId]       = useState<string | null>(null)
+  const [serviceId,      setServiceId]      = useState('')
+  const [projectName,    setProjectName]    = useState('')
+  const [amount,         setAmount]         = useState('')
+  const [deadline,       setDeadline]       = useState('')
+  const [statusRu,       setStatusRu]       = useState('Новый')
+  const [comment,        setComment]        = useState('')
+  const [loading,        setLoading]        = useState(false)
+  const [error,          setError]          = useState<string | null>(null)
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
 
-  // Pre-fill из данных заявки
   useEffect(() => {
     if (!request || !open) return
     setClientId(null)
-    setProjectName(request.service_title ?? '')
-    setAmount(request.budget_int ? String(request.budget_int) : '')
+    setProjectName(request.service ?? '')
+    setAmount(request.budget > 0 ? String(request.budget) : '')
     setStatusRu('Новый')
     setComment('')
     setDeadline('')
     setError(null)
     setCreatedOrderId(null)
 
-    // Попробуем найти услугу по названию
     const matchedService = services.find(s =>
-      s.name.toLowerCase().includes((request.service_title ?? '').toLowerCase()) ||
-      (request.service_title ?? '').toLowerCase().includes(s.name.toLowerCase())
+      s.name.toLowerCase().includes((request.service ?? '').toLowerCase()) ||
+      (request.service ?? '').toLowerCase().includes(s.name.toLowerCase())
     )
     setServiceId(matchedService?.id ?? '')
   }, [request, open, services])
@@ -83,16 +82,18 @@ export function ConvertRequestModal({
     if (!projectName.trim()) { setError('Укажите название проекта'); return }
     setLoading(true); setError(null)
     try {
-      // Если клиент не выбран — создаём из данных заявки
       let resolvedClientId = clientId
-      if (!resolvedClientId && request.telegram) {
+      if (!resolvedClientId) {
+        const tg = request.telegram
+          ? (request.telegram.startsWith('@') ? request.telegram : `@${request.telegram}`)
+          : null
         const newClient = await createCRMClient({
-          name:     `@${request.telegram}`,
-          telegram: `@${request.telegram}`,
+          name:    tg ?? request.name,
+          telegram: tg,
           discord:  request.discord || null,
           email:    null,
           country:  null,
-          note:     `Создан из заявки #${request.order_number}`,
+          note:     `Создан из заявки #${displayNum} (${request.name})`,
         })
         resolvedClientId = newClient.id
         onClientCreated()
@@ -111,7 +112,6 @@ export function ConvertRequestModal({
         comment:      comment.trim() || null,
       })
 
-      // Отмечаем заявку как конвертированную
       await updateRequestStatus(request.id, 'converted')
 
       setCreatedOrderId(order.id)
@@ -128,7 +128,7 @@ export function ConvertRequestModal({
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={(e) => { if (e.target===e.currentTarget && !loading) onClose() }}
+      onClick={e => { if (e.target===e.currentTarget && !loading) onClose() }}
     >
       <div style={{ width:560,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 
@@ -142,7 +142,7 @@ export function ConvertRequestModal({
           </button>
         </div>
 
-        {/* Success state */}
+        {/* Success */}
         {createdOrderId ? (
           <div style={{ padding:'32px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:16,textAlign:'center' }}>
             <div style={{ width:60,height:60,borderRadius:'50%',background:'var(--crm-green-dim)',display:'flex',alignItems:'center',justifyContent:'center' }}>
@@ -160,33 +160,27 @@ export function ConvertRequestModal({
           </div>
         ) : (
           <>
-            {/* Body */}
             <div style={{ padding:'20px 24px',display:'flex',flexDirection:'column',gap:14 }}>
 
               {/* Инфо из заявки */}
               {request && (
                 <div style={{ padding:'12px 14px',background:'var(--crm-s3)',borderRadius:8,fontSize:12,color:'var(--crm-muted)',lineHeight:1.6 }}>
-                  <span style={{ fontWeight:600,color:'var(--crm-text)' }}>Заявка #{request.order_number}: </span>
-                  {request.telegram ? `@${request.telegram}` : '—'} · {request.service_title ?? '—'} · {request.budget ?? '—'}
+                  <span style={{ fontWeight:600,color:'var(--crm-text)' }}>Заявка #{displayNum}: {request.name}</span>
+                  {' '}· {request.telegram ? `@${request.telegram}` : '—'}
+                  {' '}· {request.service ?? '—'}
+                  {' '}· {request.budget > 0 ? `${request.budget.toLocaleString('ru-RU')} ₽` : '—'}
                 </div>
               )}
 
-              {/* Клиент */}
               <F label="КЛИЕНТ">
-                <ComboboxClient
-                  value={clientId}
-                  onChange={setClientId}
-                  clients={clients}
-                  onClientCreated={onClientCreated}
-                />
-                {!clientId && request?.telegram && (
+                <ComboboxClient value={clientId} onChange={setClientId} clients={clients} onClientCreated={onClientCreated}/>
+                {!clientId && (
                   <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:4 }}>
-                    Если не выбрать — будет создан новый клиент «@{request.telegram}»
+                    Если не выбрать — будет создан новый клиент из данных заявки
                   </div>
                 )}
               </F>
 
-              {/* Услуга + проект */}
               <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
                 <F label="УСЛУГА">
                   <select value={serviceId} onChange={e=>setServiceId(e.target.value)} style={fs} onFocus={fb} onBlur={ub}>
@@ -227,7 +221,6 @@ export function ConvertRequestModal({
               )}
             </div>
 
-            {/* Footer */}
             <div style={{ display:'flex',justifyContent:'flex-end',gap:10,padding:'16px 24px',borderTop:'1px solid var(--crm-border2)',flexShrink:0 }}>
               <button onClick={onClose} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
                 onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-border2)';e.currentTarget.style.color='var(--crm-text)'}}
@@ -235,7 +228,8 @@ export function ConvertRequestModal({
                 Отмена
               </button>
               <button onClick={handleSubmit} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-green)',border:'none',color:'#fff',fontSize:13,fontWeight:600,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1,display:'flex',alignItems:'center',gap:7,transition:'opacity 0.15s' }}
-                onMouseEnter={e=>{if(!loading)e.currentTarget.style.opacity='0.85'}} onMouseLeave={e=>{if(!loading)e.currentTarget.style.opacity='1'}}>
+                onMouseEnter={e=>{if(!loading)e.currentTarget.style.opacity='0.85'}}
+                onMouseLeave={e=>{if(!loading)e.currentTarget.style.opacity='1'}}>
                 {loading
                   ? <><Loader2 size={14} strokeWidth={2} style={{animation:'spin 0.8s linear infinite'}}/>Создаём...</>
                   : <><CheckCircle size={14} strokeWidth={2}/>Создать заказ</>
