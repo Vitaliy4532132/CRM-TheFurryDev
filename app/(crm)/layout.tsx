@@ -1,7 +1,14 @@
 import { Sidebar } from '@/components/crm/sidebar'
 import { Topbar } from '@/components/crm/topbar'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 
-export default function CRMLayout({ children }: { children: React.ReactNode }) {
+export default async function CRMLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
   return (
     <div
       style={{
@@ -14,7 +21,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-        <Topbar userEmail={null} />
+        <Topbar userEmail={user.email ?? null} />
         <main style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
           {children}
         </main>

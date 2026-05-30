@@ -12,7 +12,10 @@ import {
   ArrowDownCircle,
   Layers,
   Settings,
+  LogOut,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -28,6 +31,13 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleLogout() {
+    await createClient().auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <aside
@@ -116,6 +126,34 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Logout */}
+      <div style={{ padding: '10px', flexShrink: 0, borderTop: '1px solid var(--crm-border)' }}>
+        <button
+          onClick={handleLogout}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 9,
+            width: '100%', padding: '9px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 400,
+            color: 'var(--crm-muted)',
+            background: 'transparent',
+            border: 'none', cursor: 'pointer',
+            transition: 'background 0.15s, color 0.15s',
+            fontFamily: 'inherit',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'var(--crm-red-dim)'
+            e.currentTarget.style.color = 'var(--crm-red)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'var(--crm-muted)'
+          }}
+        >
+          <LogOut size={16} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+          Выйти
+        </button>
+      </div>
 
       {/* Hover styles */}
       <style>{`

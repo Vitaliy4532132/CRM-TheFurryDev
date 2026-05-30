@@ -38,8 +38,18 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Обновляем сессию — нужно для авто-рефреша токена
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { pathname } = request.nextUrl
+  const isLoginPage = pathname === '/login'
+
+  if (!user && !isLoginPage) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (user && isLoginPage) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
 
   return response
 }

@@ -1,25 +1,37 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Loader2, AlertCircle } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(false)
   const [shake, setShake]     = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(false)
 
-    setTimeout(() => {
+    const form = e.currentTarget
+    const email    = (form.elements.namedItem('email')    as HTMLInputElement).value
+    const password = (form.elements.namedItem('password') as HTMLInputElement).value
+
+    const { error: authError } = await createClient().auth.signInWithPassword({ email, password })
+
+    if (authError) {
       setLoading(false)
       setError(true)
       setShake(true)
       setTimeout(() => setShake(false), 500)
-    }, 1200)
+    } else {
+      router.push('/dashboard')
+      router.refresh()
+    }
   }
 
   const fieldStyle: React.CSSProperties = {
@@ -72,6 +84,7 @@ export default function LoginPage() {
           </label>
           <input
             type="email"
+            name="email"
             placeholder="admin@thefurry.store"
             autoComplete="email"
             required
@@ -85,6 +98,7 @@ export default function LoginPage() {
           </label>
           <input
             type="password"
+            name="password"
             placeholder="••••••••"
             autoComplete="current-password"
             required
