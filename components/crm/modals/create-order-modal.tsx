@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Loader2, AlertCircle, Pencil, Lock } from 'lucide-react'
-import { createCRMOrder } from '@/lib/crm/api'
+import { X, Loader2, AlertCircle, Pencil, Lock, CreditCard } from 'lucide-react'
+import { createCRMOrder, createCRMPayment } from '@/lib/crm/api'
 import { ComboboxClient } from '@/components/crm/combobox-client'
 import { ORDER_STATUS_TO_DB } from '@/lib/crm/helpers'
-import type { CRMClient, CRMService } from '@/types/crm'
+import type { CRMClient, CRMService, PaymentMethod } from '@/types/crm'
 
 interface CreateOrderModalProps {
   open: boolean
@@ -34,6 +34,13 @@ function ub(e: React.FocusEvent<HTMLElement>) { (e.currentTarget as HTMLElement)
 
 const STATUSES_RU = ['Новый','В обсуждении','Ожидает оплату','В работе','На проверке','Правки','Готово','Завершён','Отменён']
 
+const BANK_PLACEHOLDER: Record<string, string> = {
+  card_ua:    'Monobank, PrivatBank, ПУМБ...',
+  card_ru:    'Сбербанк, Тинькофф, Альфа...',
+  card_eu:    'Wise, Revolut, N26...',
+  card_other: 'Название банка или сервиса...',
+}
+
 const EMPTY = {
   clientId:    null as string | null,
   serviceId:   '',
@@ -49,17 +56,23 @@ const EMPTY = {
 export function CreateOrderModal({
   open, onClose, onSuccess, clients, services, onClientCreated,
 }: CreateOrderModalProps) {
-  const [form,              setForm]              = useState(EMPTY)
-  const [orderNumber,       setOrderNumber]       = useState('')
-  const [orderNumEditable,  setOrderNumEditable]  = useState(false)
-  const [loading,           setLoading]           = useState(false)
-  const [error,             setError]             = useState<string | null>(null)
+  const [form,             setForm]             = useState(EMPTY)
+  const [orderNumber,      setOrderNumber]      = useState('')
+  const [orderNumEditable, setOrderNumEditable] = useState(false)
+  const [paymentMethod,    setPaymentMethod]    = useState('')
+  const [cardRegion,       setCardRegion]       = useState('')
+  const [bankName,         setBankName]         = useState('')
+  const [loading,          setLoading]          = useState(false)
+  const [error,            setError]            = useState<string | null>(null)
 
   useEffect(() => {
     if (open) {
       setForm(EMPTY)
       setOrderNumber('')
       setOrderNumEditable(false)
+      setPaymentMethod('')
+      setCardRegion('')
+      setBankName('')
       setError(null)
     }
   }, [open])
@@ -76,25 +89,24 @@ export function CreateOrderModal({
       setForm(f => ({ ...f, [key]: e.target.value }))
 
   function toggleOrderNum() {
-    if (orderNumEditable) {
-      setOrderNumber('')
-    }
+    if (orderNumEditable) setOrderNumber('')
     setOrderNumEditable(prev => !prev)
   }
 
+  const hasPaid = Number(form.paid) > 0
+
   async function handleSubmit() {
-    if (!form.clientId)         { setError('Выберите клиента'); return }
-    if (!form.projectName.trim()) { setError('Укажите название проекта'); return }
+    if (!form.clientId)            { setError('Выберите клиента'); return }
+    if (!form.projectName.trim())  { setError('Укажите название проекта'); return }
     const manualNum = orderNumEditable && orderNumber.trim()
-      ? parseInt(orderNumber, 10)
-      : undefined
+      ? parseInt(orderNumber, 10) : undefined
     if (manualNum !== undefined && (isNaN(manualNum) || manualNum < 1)) {
       setError('Номер заказа должен быть положительным числом'); return
     }
     setLoading(true); setError(null)
     try {
       const dbStatus = ORDER_STATUS_TO_DB[form.statusRu] ?? 'new'
-      await createCRMOrder({
+      const newOrder = await createCRMOrder({
         client_id:    form.clientId,
         service_id:   form.serviceId || null,
         project_name: form.projectName.trim(),
@@ -106,6 +118,27 @@ export function CreateOrderModal({
         comment:      form.comment.trim() || null,
         ...(manualNum !== undefined ? { order_number: manualNum } : {}),
       })
+
+      // Auto-create payment if paid > 0
+      if (hasPaid && newOrder?.id) {
+        const finalMethod: PaymentMethod = paymentMethod === 'card'
+          ? (cardRegion || 'card_other') as PaymentMethod
+          : (paymentMethod || 'other') as PaymentMethod
+
+        const paymentComment = bankName.trim()
+          ? bankName.trim() + (form.comment.trim() ? ' | ' + form.comment.trim() : '')
+          : form.comment.trim() || null
+
+        await createCRMPayment({
+          order_id:       newOrder.id,
+          client_id:      form.clientId,
+          amount:         parseInt(form.paid, 10),
+          payment_method: finalMethod,
+          payment_date:   new Date().toISOString().split('T')[0],
+          comment:        paymentComment,
+        })
+      }
+
       onSuccess()
       onClose()
     } catch (e) {
@@ -167,10 +200,7 @@ export function CreateOrderModal({
                 onMouseEnter={e=>{if(!orderNumEditable){e.currentTarget.style.borderColor='var(--crm-blue)';e.currentTarget.style.color='var(--crm-blue)'}}}
                 onMouseLeave={e=>{if(!orderNumEditable){e.currentTarget.style.borderColor='var(--crm-border2)';e.currentTarget.style.color='var(--crm-muted)'}}}
               >
-                {orderNumEditable
-                  ? <><Lock size={10} strokeWidth={2}/>Авто</>
-                  : <><Pencil size={10} strokeWidth={2}/>Вручную</>
-                }
+                {orderNumEditable ? <><Lock size={10} strokeWidth={2}/>Авто</> : <><Pencil size={10} strokeWidth={2}/>Вручную</>}
               </button>
             </div>
             <input
@@ -180,12 +210,7 @@ export function CreateOrderModal({
               onChange={e => setOrderNumber(e.target.value)}
               disabled={!orderNumEditable}
               min={1}
-              style={{
-                ...fs,
-                opacity: orderNumEditable ? 1 : 0.5,
-                cursor: orderNumEditable ? 'text' : 'not-allowed',
-                borderColor: orderNumEditable ? 'var(--crm-blue)' : 'var(--crm-border2)',
-              }}
+              style={{ ...fs, opacity:orderNumEditable?1:0.5, cursor:orderNumEditable?'text':'not-allowed', borderColor:orderNumEditable?'var(--crm-blue)':'var(--crm-border2)' }}
               onFocus={fb} onBlur={ub}
             />
           </div>
@@ -198,6 +223,7 @@ export function CreateOrderModal({
             <textarea placeholder="Описание заказа..." value={form.description} onChange={set('description')} style={ta} onFocus={fb} onBlur={ub}/>
           </F>
 
+          {/* Сумма + Оплачено */}
           <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
             <F label="СУММА ЗАКАЗА (₽)">
               <input type="number" placeholder="0" min={0} value={form.amount} onChange={set('amount')} style={fs} onFocus={fb} onBlur={ub}/>
@@ -207,6 +233,67 @@ export function CreateOrderModal({
             </F>
           </div>
 
+          {/* Способ оплаты — появляется когда paid > 0 */}
+          {hasPaid && (
+            <div style={{
+              background: 'var(--crm-s3)',
+              border: '1px solid var(--crm-border2)',
+              borderRadius: 8, padding: 12,
+              display: 'flex', flexDirection: 'column', gap: 8,
+              animation: 'crm-fadeIn 0.2s ease',
+            }}>
+              {/* Заголовок */}
+              <div style={{ display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:600,color:'var(--crm-muted)',textTransform:'uppercase',letterSpacing:'0.06em' }}>
+                <CreditCard size={12} strokeWidth={2}/>
+                Способ оплаты
+              </div>
+
+              {/* Тип */}
+              <select
+                value={paymentMethod}
+                onChange={e => { setPaymentMethod(e.target.value); setCardRegion(''); setBankName('') }}
+                style={fs}
+                onFocus={fb} onBlur={ub}
+              >
+                <option value="">Выберите способ...</option>
+                <option value="card">Карта</option>
+                <option value="transfer">Перевод</option>
+                <option value="crypto">Крипта</option>
+                <option value="paypal">PayPal</option>
+                <option value="other">Другое</option>
+              </select>
+
+              {/* Регион карты */}
+              {paymentMethod === 'card' && (
+                <select
+                  value={cardRegion}
+                  onChange={e => { setCardRegion(e.target.value); setBankName('') }}
+                  style={fs}
+                  onFocus={fb} onBlur={ub}
+                >
+                  <option value="">Страна карты...</option>
+                  <option value="card_ua">🇺🇦 Украина</option>
+                  <option value="card_ru">🇷🇺 Россия</option>
+                  <option value="card_eu">🇪🇺 Европа</option>
+                  <option value="card_other">🌍 Другая</option>
+                </select>
+              )}
+
+              {/* Банк */}
+              {paymentMethod === 'card' && cardRegion && (
+                <input
+                  type="text"
+                  value={bankName}
+                  onChange={e => setBankName(e.target.value)}
+                  placeholder={BANK_PLACEHOLDER[cardRegion] ?? 'Название банка или сервиса...'}
+                  style={fs}
+                  onFocus={fb} onBlur={ub}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Дедлайн + Статус */}
           <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
             <F label="ДЕДЛАЙН">
               <input type="date" value={form.deadline} onChange={set('deadline')} style={{...fs,colorScheme:'dark'}} onFocus={fb} onBlur={ub}/>
@@ -244,9 +331,13 @@ export function CreateOrderModal({
         </div>
 
         <style>{`
-          select option{background:var(--crm-s3);color:var(--crm-text)}
-          input[type=number]::-webkit-inner-spin-button{opacity:0.4}
-          @keyframes spin{to{transform:rotate(360deg)}}
+          select option { background: var(--crm-s3); color: var(--crm-text); }
+          input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+          @keyframes spin { to { transform: rotate(360deg); } }
+          @keyframes crm-fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
         `}</style>
       </div>
     </div>
