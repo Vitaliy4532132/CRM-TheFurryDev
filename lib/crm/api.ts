@@ -212,6 +212,17 @@ export async function getPayments(): Promise<CRMPayment[]> {
   return data ?? []
 }
 
+export async function getPaymentsByClient(clientId: string): Promise<CRMPayment[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('crm_payments')
+    .select('*, order:crm_orders(id, order_number, project_name)')
+    .eq('client_id', clientId)
+    .order('payment_date', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
 export async function getPaymentsByOrder(orderId: string): Promise<CRMPayment[]> {
   const supabase = createClient()
   const { data, error } = await supabase

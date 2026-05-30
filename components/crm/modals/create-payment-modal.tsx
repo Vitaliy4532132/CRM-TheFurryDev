@@ -3,19 +3,16 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 import { createCRMPayment, updateCRMOrder } from '@/lib/crm/api'
-import { PAYMENT_METHOD_TO_DB } from '@/lib/crm/helpers'
 import type { CRMOrder, PaymentMethod } from '@/types/crm'
 
 interface CreatePaymentModalProps {
   open: boolean
   onClose: () => void
   onSuccess: (amount: number) => void
-  // Pre-filled mode (used from order detail page)
   orderId?: string | null
   clientId?: string | null
   orderLabel?: string
   clientLabel?: string
-  // Select mode (used from finance page)
   orders?: CRMOrder[]
 }
 
@@ -35,7 +32,35 @@ function F({ label, children }: { label: string; children: React.ReactNode }) {
 function fb(e: React.FocusEvent<HTMLElement>) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-blue)' }
 function ub(e: React.FocusEvent<HTMLElement>) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-border2)' }
 
-const METHODS_RU = ['Карта', 'Перевод', 'Крипта', 'PayPal', 'Другое']
+const PAY_TYPES   = ['Карта', 'Перевод', 'Крипта', 'PayPal', 'Другое']
+const CARD_TYPES  = [
+  { key: 'ua',    label: '🇺🇦 Украина (Monobank, PrivatBank...)' },
+  { key: 'ru',    label: '🇷🇺 Россия (Сбер, Тинькофф...)' },
+  { key: 'eu',    label: '🇪🇺 Европа (Wise, Revolut...)' },
+  { key: 'other', label: '🌍 Другая страна' },
+]
+const BANK_PLACEHOLDER: Record<string, string> = {
+  ua:    'Monobank, PrivatBank, ПУМБ...',
+  ru:    'Сбербанк, Тинькофф, Альфа...',
+  eu:    'Wise, Revolut, N26...',
+  other: 'Название банка / сервиса',
+}
+const PAY_TYPE_TO_METHOD: Record<string, PaymentMethod> = {
+  'Перевод': 'transfer',
+  'Крипта':  'crypto',
+  'PayPal':  'paypal',
+  'Другое':  'other',
+}
+
+function resolveMethod(payType: string, cardType: string): PaymentMethod {
+  if (payType === 'Карта') {
+    if (cardType === 'ua')    return 'card_ua'
+    if (cardType === 'ru')    return 'card_ru'
+    if (cardType === 'eu')    return 'card_eu'
+    return 'card_other'
+  }
+  return PAY_TYPE_TO_METHOD[payType] ?? 'other'
+}
 
 export function CreatePaymentModal({
   open, onClose, onSuccess,
@@ -43,11 +68,13 @@ export function CreatePaymentModal({
   orderLabel = '', clientLabel = '',
   orders,
 }: CreatePaymentModalProps) {
-  const selectMode = !!orders && !orderId   // режим выбора заказа
+  const selectMode = !!orders && !orderId
 
   const [selectedOrderId, setSelectedOrderId] = useState('')
   const [amount,    setAmount]    = useState('')
-  const [methodRu,  setMethodRu]  = useState('Карта')
+  const [payType,   setPayType]   = useState('Карта')
+  const [cardType,  setCardType]  = useState('ua')
+  const [bank,      setBank]      = useState('')
   const [date,      setDate]      = useState('')
   const [comment,   setComment]   = useState('')
   const [loading,   setLoading]   = useState(false)
@@ -55,7 +82,8 @@ export function CreatePaymentModal({
 
   useEffect(() => {
     if (open) {
-      setSelectedOrderId(''); setAmount(''); setMethodRu('Карта')
+      setSelectedOrderId(''); setAmount('')
+      setPayType('Карта'); setCardType('ua'); setBank('')
       setDate(new Date().toISOString().split('T')[0])
       setComment(''); setError(null)
     }
@@ -68,15 +96,20 @@ export function CreatePaymentModal({
     return () => window.removeEventListener('keydown', h)
   }, [open, onClose])
 
-  // Resolve effective values
-  const selectedOrder = selectMode
-    ? (orders?.find(o => o.id === selectedOrderId) ?? null)
-    : null
-
+  const selectedOrder   = selectMode ? (orders?.find(o => o.id === selectedOrderId) ?? null) : null
   const effectiveOrderId  = orderId ?? (selectMode ? selectedOrderId : null)
   const effectiveClientId = clientId ?? selectedOrder?.client_id ?? null
   const effectiveLabel    = orderLabel || (selectedOrder ? `#${selectedOrder.order_number} — ${selectedOrder.project_name}` : '')
   const effectiveClient   = clientLabel || selectedOrder?.client?.name || ''
+
+  function buildComment(): string | null {
+    const bankPart    = bank.trim()
+    const commentPart = comment.trim()
+    if (bankPart && commentPart) return `${bankPart} | ${commentPart}`
+    if (bankPart)                return bankPart
+    if (commentPart)             return commentPart
+    return null
+  }
 
   async function handleSubmit() {
     if (selectMode && !selectedOrderId) { setError('Выберите заказ'); return }
@@ -84,20 +117,17 @@ export function CreatePaymentModal({
     if (!num || num <= 0) { setError('Укажите сумму платежа'); return }
     setLoading(true); setError(null)
     try {
-      const method = (PAYMENT_METHOD_TO_DB[methodRu] ?? 'other') as PaymentMethod
+      const method = resolveMethod(payType, cardType)
       await createCRMPayment({
         order_id:       effectiveOrderId,
         client_id:      effectiveClientId,
         amount:         num,
         payment_method: method,
         payment_date:   date || new Date().toISOString().split('T')[0],
-        comment:        comment.trim() || null,
+        comment:        buildComment(),
       })
-      // В режиме выбора — автоматически обновляем paid у заказа
       if (selectMode && selectedOrder) {
-        await updateCRMOrder(selectedOrder.id, {
-          paid: selectedOrder.paid + num,
-        })
+        await updateCRMOrder(selectedOrder.id, { paid: selectedOrder.paid + num })
       }
       onSuccess(num)
       onClose()
@@ -130,21 +160,21 @@ export function CreatePaymentModal({
         {/* Body */}
         <div style={{ padding:'20px 24px',display:'flex',flexDirection:'column',gap:14 }}>
 
-          {/* Заказ */}
+          {/* Заказ / Клиент */}
           {selectMode ? (
             <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
               <F label="ЗАКАЗ">
-                <select value={selectedOrderId} onChange={e => setSelectedOrderId(e.target.value)} style={fs} onFocus={fb} onBlur={ub}>
+                <select value={selectedOrderId} onChange={e=>setSelectedOrderId(e.target.value)} style={fs} onFocus={fb} onBlur={ub}>
                   <option value="">Выберите заказ</option>
                   {orders?.map(o => (
                     <option key={o.id} value={o.id}>
-                      #{o.order_number} — {o.project_name} {o.client?.name ? `(${o.client.name})` : ''}
+                      #{o.order_number} — {o.project_name}{o.client?.name ? ` (${o.client.name})` : ''}
                     </option>
                   ))}
                 </select>
               </F>
               <F label="КЛИЕНТ">
-                <div style={{ ...fs, display:'flex',alignItems:'center',color:effectiveClient?'var(--crm-text)':'var(--crm-muted)',fontStyle:effectiveClient?'normal':'italic' }}>
+                <div style={{ ...fs,display:'flex',alignItems:'center',color:effectiveClient?'var(--crm-text)':'var(--crm-muted)',fontStyle:effectiveClient?'normal':'italic' }}>
                   {effectiveClient || 'автозаполнение'}
                 </div>
               </F>
@@ -152,35 +182,55 @@ export function CreatePaymentModal({
           ) : (
             <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
               <F label="ЗАКАЗ">
-                <div style={{ ...fs, display:'flex',alignItems:'center',color:effectiveLabel?'var(--crm-text)':'var(--crm-muted)' }}>
-                  {effectiveLabel || '—'}
-                </div>
+                <div style={{ ...fs,display:'flex',alignItems:'center',color:effectiveLabel?'var(--crm-text)':'var(--crm-muted)' }}>{effectiveLabel||'—'}</div>
               </F>
               <F label="КЛИЕНТ">
-                <div style={{ ...fs, display:'flex',alignItems:'center',color:effectiveClient?'var(--crm-text)':'var(--crm-muted)' }}>
-                  {effectiveClient || '—'}
-                </div>
+                <div style={{ ...fs,display:'flex',alignItems:'center',color:effectiveClient?'var(--crm-text)':'var(--crm-muted)' }}>{effectiveClient||'—'}</div>
               </F>
             </div>
           )}
 
-          <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
-            <F label="СУММА ОПЛАТЫ (₽)">
-              <input type="number" placeholder="0" min={1} value={amount} onChange={e => setAmount(e.target.value)} style={fs} onFocus={fb} onBlur={ub}/>
-            </F>
-            <F label="СПОСОБ ОПЛАТЫ">
-              <select value={methodRu} onChange={e => setMethodRu(e.target.value)} style={fs} onFocus={fb} onBlur={ub}>
-                {METHODS_RU.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </F>
-          </div>
-
-          <F label="ДАТА ОПЛАТЫ">
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{...fs,colorScheme:'dark'}} onFocus={fb} onBlur={ub}/>
+          {/* Сумма */}
+          <F label="СУММА ОПЛАТЫ (₽)">
+            <input type="number" placeholder="0" min={1} value={amount} onChange={e=>setAmount(e.target.value)} style={fs} onFocus={fb} onBlur={ub}/>
           </F>
 
+          {/* Способ оплаты — Шаг 1 */}
+          <F label="СПОСОБ ОПЛАТЫ">
+            <select value={payType} onChange={e=>{setPayType(e.target.value);setBank('')}} style={fs} onFocus={fb} onBlur={ub}>
+              {PAY_TYPES.map(m=><option key={m}>{m}</option>)}
+            </select>
+          </F>
+
+          {/* Карта — Шаг 2 */}
+          {payType === 'Карта' && (
+            <div style={{ display:'flex',flexDirection:'column',gap:10,padding:'14px 16px',background:'var(--crm-s3)',borderRadius:10,border:'1px solid var(--crm-border)' }}>
+              <F label="СТРАНА КАРТЫ">
+                <select value={cardType} onChange={e=>{setCardType(e.target.value);setBank('')}} style={fs} onFocus={fb} onBlur={ub}>
+                  {CARD_TYPES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+              </F>
+              <F label="БАНК / СЕРВИС (НЕОБЯЗАТЕЛЬНО)">
+                <input
+                  type="text"
+                  placeholder={BANK_PLACEHOLDER[cardType] ?? 'Название банка'}
+                  value={bank}
+                  onChange={e=>setBank(e.target.value)}
+                  style={fs}
+                  onFocus={fb} onBlur={ub}
+                />
+              </F>
+            </div>
+          )}
+
+          {/* Дата */}
+          <F label="ДАТА ОПЛАТЫ">
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{...fs,colorScheme:'dark'}} onFocus={fb} onBlur={ub}/>
+          </F>
+
+          {/* Комментарий */}
           <F label="КОММЕНТАРИЙ">
-            <textarea placeholder="Комментарий..." value={comment} onChange={e => setComment(e.target.value)} style={ta} onFocus={fb} onBlur={ub}/>
+            <textarea placeholder="Комментарий..." value={comment} onChange={e=>setComment(e.target.value)} style={ta} onFocus={fb} onBlur={ub}/>
           </F>
 
           {error && (

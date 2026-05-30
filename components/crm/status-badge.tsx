@@ -60,3 +60,32 @@ export function StatusBadge({ status }: StatusBadgeProps) {
 }
 
 export type { OrderStatus, PaymentStatus, BadgeStatus }
+
+// ── PaymentMethodBadge ────────────────────────────────────────────────────────
+
+const PAYMENT_METHOD_BADGE_CFG: Record<string, { color: string; bg: string; label: string }> = {
+  card_ua:    { color: '#FFD700',              bg: 'rgba(255,215,0,0.12)',       label: '🇺🇦 Карта UA' },
+  card_ru:    { color: 'var(--crm-red)',       bg: 'var(--crm-red-dim)',         label: '🇷🇺 Карта RU' },
+  card_eu:    { color: 'var(--crm-blue)',      bg: 'var(--crm-blue-dim)',        label: '🇪🇺 Карта EU' },
+  card_other: { color: 'var(--crm-muted)',     bg: 'rgba(100,116,139,0.12)',     label: '🌍 Карта' },
+  card:       { color: 'var(--crm-muted)',     bg: 'rgba(100,116,139,0.12)',     label: 'Карта' },
+  transfer:   { color: 'var(--crm-teal)',      bg: 'var(--crm-teal-dim)',        label: 'Перевод' },
+  crypto:     { color: 'var(--crm-yellow)',    bg: 'var(--crm-yellow-dim)',      label: 'Крипта' },
+  paypal:     { color: 'var(--crm-purple)',    bg: 'var(--crm-purple-dim)',      label: 'PayPal' },
+  other:      { color: 'var(--crm-muted)',     bg: 'rgba(100,116,139,0.12)',     label: 'Другое' },
+}
+
+export function PaymentMethodBadge({ method }: { method: string | null }) {
+  if (!method) return <span style={{ color: 'var(--crm-muted)', fontSize: 13 }}>—</span>
+  const cfg = PAYMENT_METHOD_BADGE_CFG[method] ?? PAYMENT_METHOD_BADGE_CFG.other
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '3px 10px', borderRadius: 6,
+      fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+      color: cfg.color, background: cfg.bg,
+    }}>
+      {cfg.label}
+    </span>
+  )
+}

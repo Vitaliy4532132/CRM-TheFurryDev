@@ -12,7 +12,10 @@ export type OrderStatus =
   | 'cancelled'
 
 export type PaymentMethod =
-  | 'card'
+  | 'card_ua'
+  | 'card_ru'
+  | 'card_eu'
+  | 'card_other'
   | 'transfer'
   | 'crypto'
   | 'paypal'
@@ -42,12 +45,15 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   cancelled:       'Отменён',
 }
 
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  card:     'Карта',
-  transfer: 'Перевод',
-  crypto:   'Крипта',
-  paypal:   'PayPal',
-  other:    'Другое',
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  card_ua:    '🇺🇦 Карта UA',
+  card_ru:    '🇷🇺 Карта RU',
+  card_eu:    '🇪🇺 Карта EU',
+  card_other: '🌍 Карта (другая)',
+  transfer:   'Перевод',
+  crypto:     'Крипта',
+  paypal:     'PayPal',
+  other:      'Другое',
 }
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
