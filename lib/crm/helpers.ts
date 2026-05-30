@@ -95,3 +95,60 @@ export function formatDeadline(deadline: string | null): string {
   if (!deadline) return '—'
   return formatDate(deadline)
 }
+
+// ─── Analytics helpers ────────────────────────────────────────────────────────
+
+export function getDateRange(period: string): { from: Date; to: Date } {
+  const to   = new Date()
+  const from = new Date()
+  switch (period) {
+    case '7d':  from.setDate(from.getDate() - 7);           break
+    case '30d': from.setDate(from.getDate() - 30);          break
+    case '3m':  from.setMonth(from.getMonth() - 3);         break
+    case '6m':  from.setMonth(from.getMonth() - 6);         break
+    case '1y':  from.setFullYear(from.getFullYear() - 1);   break
+    case 'all': from.setFullYear(2020);                     break
+  }
+  from.setHours(0, 0, 0, 0)
+  return { from, to }
+}
+
+export function getPrevDateRange(from: Date, to: Date): { from: Date; to: Date } {
+  const duration = to.getTime() - from.getTime()
+  return {
+    from: new Date(from.getTime() - duration),
+    to:   new Date(from.getTime()),
+  }
+}
+
+export function getGrouping(period: string): 'day' | 'week' | 'month' {
+  if (period === '7d' || period === '30d') return 'day'
+  if (period === '3m')                    return 'week'
+  return 'month'
+}
+
+export function getBucketLabel(date: Date, grouping: 'day' | 'week' | 'month'): string {
+  if (grouping === 'day') {
+    return `${String(date.getDate()).padStart(2,'0')}.${String(date.getMonth()+1).padStart(2,'0')}`
+  }
+  if (grouping === 'week') {
+    const d   = new Date(date)
+    const jan4 = new Date(d.getFullYear(), 0, 4)
+    const week = Math.round(
+      ((d.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getDay() || 7) - 1)) / 7
+    ) + 1
+    return `Нед ${week}`
+  }
+  return date.toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' })
+}
+
+export function getBucketMs(date: Date, grouping: 'day' | 'week' | 'month'): number {
+  const d = new Date(date)
+  if (grouping === 'day')   { d.setHours(0,0,0,0); return d.getTime() }
+  if (grouping === 'week')  {
+    const day  = d.getDay() || 7
+    d.setDate(d.getDate() - day + 1)
+    d.setHours(0,0,0,0); return d.getTime()
+  }
+  return new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+}

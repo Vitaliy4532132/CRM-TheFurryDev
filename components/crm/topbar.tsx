@@ -8,8 +8,9 @@ const pageTitles: Record<string, string> = {
   '/orders':    'Заказы',
   '/clients':   'Клиенты',
   '/requests':  'Заявки',
-  '/finance':   'Финансы',
-  '/expenses':  'Расходы',
+  '/finance':    'Финансы',
+  '/analytics':  'Аналитика',
+  '/expenses':   'Расходы',
   '/services':  'Услуги',
   '/settings':  'Настройки',
 }
