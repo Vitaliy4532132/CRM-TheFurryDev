@@ -159,7 +159,8 @@ export async function getOrdersByClient(clientId: string): Promise<CRMOrder[]> {
 }
 
 export async function createCRMOrder(
-  input: Omit<CRMOrder, 'id' | 'order_number' | 'created_at' | 'updated_at' | 'client' | 'service'>,
+  input: Omit<CRMOrder, 'id' | 'order_number' | 'created_at' | 'updated_at' | 'client' | 'service'>
+    & { order_number?: number },
 ): Promise<CRMOrder> {
   const supabase = createClient()
   const { data, error } = await supabase

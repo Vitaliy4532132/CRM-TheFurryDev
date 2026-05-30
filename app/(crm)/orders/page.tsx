@@ -111,6 +111,20 @@ export default function OrdersPage() {
     setClients(c)
   }, [])
 
+  // ── Приоритет статусов ─────────────────────────────────────────────────────
+
+  const STATUS_PRIORITY: Record<string, number> = {
+    in_progress:     0,
+    review:          1,
+    revision:        2,
+    discussion:      3,
+    waiting_payment: 4,
+    new:             5,
+    done:            6,
+    completed:       7,
+    cancelled:       8,
+  }
+
   // ── Фильтрация ─────────────────────────────────────────────────────────────
 
   const filtered = orders.filter(o => {
@@ -138,6 +152,14 @@ export default function OrdersPage() {
     if (dateRange === 'month'      && !isThisMonth(o.created_at)) return false
     if (dateRange === 'last_month' && !isLastMonth(o.created_at)) return false
     return true
+  })
+
+  // ── Сортировка: активные → новые → остальные, внутри группы — новые сверху ─
+
+  const sortedOrders = [...filtered].sort((a, b) => {
+    const priorityDiff = (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9)
+    if (priorityDiff !== 0) return priorityDiff
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 
   // ── Удаление ───────────────────────────────────────────────────────────────
@@ -196,7 +218,7 @@ export default function OrdersPage() {
 
               {loading && [0,1,2,3,4,5,6].map(i => <SkeletonRow key={i}/>)}
 
-              {!loading && !error && filtered.length === 0 && (
+              {!loading && !error && sortedOrders.length === 0 && (
                 <tr>
                   <td colSpan={11} style={{ padding:'48px 24px',textAlign:'center' }}>
                     <div style={{ display:'flex',flexDirection:'column',alignItems:'center',gap:12 }}>
@@ -217,17 +239,17 @@ export default function OrdersPage() {
                 </tr>
               )}
 
-              {!loading && filtered.map((order, i) => {
+              {!loading && sortedOrders.map((order, i) => {
                 const rest = order.amount - order.paid
                 const pay  = getPaymentStatus(order.amount, order.paid)
                 const paidColor = order.paid === 0 ? 'var(--crm-red)' : order.paid < order.amount ? 'var(--crm-orange)' : 'var(--crm-green)'
 
                 return (
-                  <tr key={order.id} style={{ borderBottom: i < filtered.length-1 ? '1px solid var(--crm-border)' : 'none', cursor:'pointer', transition:'background 0.12s' }}
+                  <tr key={order.id} style={{ borderBottom: i < sortedOrders.length-1 ? '1px solid var(--crm-border)' : 'none', cursor:'pointer', transition:'background 0.12s' }}
                     onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
                     onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
-                      #{order.order_number}
+                      #{order.order_number ?? order.id.slice(0, 6)}
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:500,color:'var(--crm-text)',whiteSpace:'nowrap' }}>
                       {order.client?.name ?? '—'}
@@ -274,7 +296,7 @@ export default function OrdersPage() {
         {!loading && (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderTop:'1px solid var(--crm-border2)' }}>
             <span style={{ fontSize:13,color:'var(--crm-muted)' }}>
-              Показано {filtered.length} из {orders.length} заказов
+              Показано {sortedOrders.length} из {orders.length} заказов
             </span>
           </div>
         )}
