@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/crm/sidebar'
 import { Topbar } from '@/components/crm/topbar'
+import { GlobalModals } from '@/components/crm/global-modals'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -26,6 +27,9 @@ export default async function CRMLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+
+      {/* Global modals driven by ?modal= URL param */}
+      <GlobalModals />
     </div>
   )
 }

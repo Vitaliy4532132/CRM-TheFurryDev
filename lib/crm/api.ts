@@ -424,3 +424,60 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     upcomingDeadlines,
   }
 }
+
+// ─── GLOBAL SEARCH ────────────────────────────────────────────────────────────
+
+export type SearchOrderResult = {
+  id:           string
+  order_number: number
+  project_name: string
+  status:       string
+  client:       { name: string } | null
+}
+
+export type SearchClientResult = {
+  id:       string
+  name:     string
+  telegram: string | null
+  discord:  string | null
+}
+
+export async function globalSearch(
+  query: string
+): Promise<{ orders: SearchOrderResult[]; clients: SearchClientResult[] }> {
+  if (query.length < 2) return { orders: [], clients: [] }
+
+  const supabase = createClient()
+  const num = parseInt(query, 10)
+
+  const ordersFilter = !isNaN(num)
+    ? `project_name.ilike.%${query}%,order_number.eq.${num}`
+    : `project_name.ilike.%${query}%`
+
+  const [ordersRes, clientsRes] = await Promise.all([
+    supabase
+      .from('crm_orders')
+      .select('id, order_number, project_name, status, client:crm_clients(name)')
+      .or(ordersFilter)
+      .limit(5),
+    supabase
+      .from('crm_clients')
+      .select('id, name, telegram, discord')
+      .or(`name.ilike.%${query}%,telegram.ilike.%${query}%,discord.ilike.%${query}%`)
+      .limit(5),
+  ])
+
+  // Supabase returns joined relations as arrays — normalize client to object | null
+  const orders: SearchOrderResult[] = (ordersRes.data ?? []).map(o => ({
+    id:           o.id,
+    order_number: o.order_number,
+    project_name: o.project_name,
+    status:       o.status,
+    client:       Array.isArray(o.client) ? (o.client[0] ?? null) : o.client,
+  }))
+
+  return {
+    orders,
+    clients: (clientsRes.data ?? []) as SearchClientResult[],
+  }
+}
