@@ -4,7 +4,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request })
 
-  const domain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN
+  const raw    = process.env.NEXT_PUBLIC_COOKIE_DOMAIN
+  const domain = raw?.startsWith('.') ? raw.slice(1) : raw
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

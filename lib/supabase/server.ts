@@ -3,7 +3,8 @@ import { cookies } from 'next/headers'
 
 export async function createClient() {
   const cookieStore = await cookies()
-  const domain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN
+  const raw    = process.env.NEXT_PUBLIC_COOKIE_DOMAIN
+  const domain = raw?.startsWith('.') ? raw.slice(1) : raw
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
