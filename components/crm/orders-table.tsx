@@ -8,13 +8,14 @@ import type { OrderStatus, PaymentStatus } from '@/components/crm/status-badge'
 import { EditOrderModal } from '@/components/crm/modals/edit-order-modal'
 
 interface Order {
-  id: string
-  client: string
-  service: string
-  amount: string
-  status: OrderStatus
-  payment: PaymentStatus
-  date: string
+  id:           string
+  order_number: number
+  client:       string
+  service:      string
+  amount:       string
+  status:       OrderStatus
+  payment:      PaymentStatus
+  date:         string
 }
 
 interface OrdersTableProps {
@@ -107,7 +108,10 @@ export function OrdersTable({ orders }: OrdersTableProps) {
           </tr>
         </thead>
         <tbody>
-          {orders.map((order, i) => (
+          {orders.map((order, i) => {
+            const displayNum = order.order_number > 0 ? `#${order.order_number}` : '#x'
+            const numColor   = order.order_number > 0 ? 'var(--crm-muted)' : 'var(--crm-border2)'
+            return (
             <tr
               key={order.id}
               style={{
@@ -128,16 +132,16 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                   padding: '13px 16px',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: 'var(--crm-muted)',
+                  color: numColor,
                   whiteSpace: 'nowrap',
                 }}
               >
                 <Link
-                  href={`/orders/${order.id.replace('#', '')}`}
+                  href={`/orders/${order.id}`}
                   style={{ color: 'inherit', textDecoration: 'none' }}
                   className="crm-order-id-link"
                 >
-                  {order.id}
+                  {displayNum}
                 </Link>
               </td>
               <td
@@ -214,7 +218,8 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                 </div>
               </td>
             </tr>
-          ))}
+          )})}
+
         </tbody>
       </table>
     </div>

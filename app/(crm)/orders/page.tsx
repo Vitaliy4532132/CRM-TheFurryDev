@@ -159,7 +159,7 @@ export default function OrdersPage() {
   const sortedOrders = [...filtered].sort((a, b) => {
     const priorityDiff = (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9)
     if (priorityDiff !== 0) return priorityDiff
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    return b.order_number - a.order_number
   })
 
   // ── Удаление ───────────────────────────────────────────────────────────────
@@ -248,8 +248,8 @@ export default function OrdersPage() {
                   <tr key={order.id} style={{ borderBottom: i < sortedOrders.length-1 ? '1px solid var(--crm-border)' : 'none', cursor:'pointer', transition:'background 0.12s' }}
                     onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
                     onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
-                    <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
-                      #{order.order_number ?? order.id.slice(0, 6)}
+                    <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,whiteSpace:'nowrap',color:order.order_number > 0 ? 'var(--crm-muted)' : 'var(--crm-border2)' }}>
+                      {order.order_number > 0 ? `#${order.order_number}` : '#x'}
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:500,color:'var(--crm-text)',whiteSpace:'nowrap' }}>
                       {order.client?.name ?? '—'}

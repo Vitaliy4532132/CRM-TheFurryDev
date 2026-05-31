@@ -216,7 +216,10 @@ export default function OrderCardPage() {
           <div style={card}>
             <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:16 }}>
               <h1 style={{ fontSize:17,fontWeight:700,color:'var(--crm-text)',margin:0,lineHeight:1.2 }}>
-                Заказ #{order.order_number} — {order.project_name}
+                {order.order_number > 0
+                  ? `Заказ #${order.order_number} — ${order.project_name}`
+                  : `Заказ — ${order.project_name}`
+                }
               </h1>
               <OrderStatusBadge status={order.status}/>
             </div>

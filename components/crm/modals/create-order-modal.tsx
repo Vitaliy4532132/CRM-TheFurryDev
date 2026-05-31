@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Loader2, AlertCircle, Pencil, Lock, CreditCard } from 'lucide-react'
+import { X, Loader2, AlertCircle, CreditCard } from 'lucide-react'
 import { createCRMOrder, createCRMPayment } from '@/lib/crm/api'
 import { ComboboxClient } from '@/components/crm/combobox-client'
 import { ORDER_STATUS_TO_DB } from '@/lib/crm/helpers'
@@ -56,10 +56,8 @@ const EMPTY = {
 export function CreateOrderModal({
   open, onClose, onSuccess, clients, services, onClientCreated,
 }: CreateOrderModalProps) {
-  const [form,             setForm]             = useState(EMPTY)
-  const [orderNumber,      setOrderNumber]      = useState('')
-  const [orderNumEditable, setOrderNumEditable] = useState(false)
-  const [paymentMethod,    setPaymentMethod]    = useState('')
+  const [form,          setForm]          = useState(EMPTY)
+  const [paymentMethod, setPaymentMethod] = useState('')
   const [cardRegion,       setCardRegion]       = useState('')
   const [bankName,         setBankName]         = useState('')
   const [loading,          setLoading]          = useState(false)
@@ -68,8 +66,6 @@ export function CreateOrderModal({
   useEffect(() => {
     if (open) {
       setForm(EMPTY)
-      setOrderNumber('')
-      setOrderNumEditable(false)
       setPaymentMethod('')
       setCardRegion('')
       setBankName('')
@@ -88,21 +84,11 @@ export function CreateOrderModal({
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm(f => ({ ...f, [key]: e.target.value }))
 
-  function toggleOrderNum() {
-    if (orderNumEditable) setOrderNumber('')
-    setOrderNumEditable(prev => !prev)
-  }
-
   const hasPaid = Number(form.paid) > 0
 
   async function handleSubmit() {
     if (!form.clientId)            { setError('Выберите клиента'); return }
     if (!form.projectName.trim())  { setError('Укажите название проекта'); return }
-    const manualNum = orderNumEditable && orderNumber.trim()
-      ? parseInt(orderNumber, 10) : undefined
-    if (manualNum !== undefined && (isNaN(manualNum) || manualNum < 1)) {
-      setError('Номер заказа должен быть положительным числом'); return
-    }
     setLoading(true); setError(null)
     try {
       const dbStatus = ORDER_STATUS_TO_DB[form.statusRu] ?? 'new'
@@ -116,7 +102,6 @@ export function CreateOrderModal({
         deadline:     form.deadline || null,
         status:       dbStatus as import('@/types/crm').OrderStatus,
         comment:      form.comment.trim() || null,
-        ...(manualNum !== undefined ? { order_number: manualNum } : {}),
       })
 
       // Auto-create payment if paid > 0
@@ -186,33 +171,6 @@ export function CreateOrderModal({
                 {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </F>
-          </div>
-
-          {/* Номер заказа */}
-          <div style={{ display:'flex',flexDirection:'column' }}>
-            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6 }}>
-              <label style={lb}>НОМЕР ЗАКАЗА</label>
-              <button
-                type="button"
-                onClick={toggleOrderNum}
-                title={orderNumEditable ? 'Отключить ручной ввод' : 'Задать вручную'}
-                style={{ display:'flex',alignItems:'center',gap:5,height:22,padding:'0 8px',borderRadius:6,background:orderNumEditable?'var(--crm-blue-dim)':'var(--crm-s3)',border:`1px solid ${orderNumEditable?'var(--crm-blue)':'var(--crm-border2)'}`,color:orderNumEditable?'var(--crm-blue)':'var(--crm-muted)',fontSize:11,fontWeight:600,cursor:'pointer',transition:'all 0.15s',fontFamily:'inherit' }}
-                onMouseEnter={e=>{if(!orderNumEditable){e.currentTarget.style.borderColor='var(--crm-blue)';e.currentTarget.style.color='var(--crm-blue)'}}}
-                onMouseLeave={e=>{if(!orderNumEditable){e.currentTarget.style.borderColor='var(--crm-border2)';e.currentTarget.style.color='var(--crm-muted)'}}}
-              >
-                {orderNumEditable ? <><Lock size={10} strokeWidth={2}/>Авто</> : <><Pencil size={10} strokeWidth={2}/>Вручную</>}
-              </button>
-            </div>
-            <input
-              type="number"
-              placeholder={orderNumEditable ? 'Введите номер заказа' : 'Заполняется автоматически'}
-              value={orderNumber}
-              onChange={e => setOrderNumber(e.target.value)}
-              disabled={!orderNumEditable}
-              min={1}
-              style={{ ...fs, opacity:orderNumEditable?1:0.5, cursor:orderNumEditable?'text':'not-allowed', borderColor:orderNumEditable?'var(--crm-blue)':'var(--crm-border2)' }}
-              onFocus={fb} onBlur={ub}
-            />
           </div>
 
           <F label="НАЗВАНИЕ ПРОЕКТА">
