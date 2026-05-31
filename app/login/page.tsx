@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, ShieldX } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 // ── SVG icons ─────────────────────────────────────────────────────────────────
@@ -72,7 +72,13 @@ function OAuthButton({ icon, label, hoverBorder, onClick, disabled }: OAuthButto
 function LoginContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
-  const oauthError   = searchParams.get('error') === 'auth_failed'
+  const errorCode = searchParams.get('error')
+  const ERROR_MESSAGES: Record<string, string> = {
+    access_denied: 'Доступ запрещён. Только владельцы студии могут войти в CRM.',
+    auth_failed:   'Ошибка входа через OAuth. Попробуйте снова.',
+  }
+  const urlErrorMessage = errorCode ? ERROR_MESSAGES[errorCode] ?? null : null
+  const isAccessDenied  = errorCode === 'access_denied'
 
   const [loading,       setLoading]       = useState(false)
   const [oauthLoading,  setOauthLoading]  = useState<'google' | 'discord' | null>(null)
@@ -162,18 +168,22 @@ function LoginContent() {
           </div>
         </div>
 
-        {/* OAuth error */}
-        {oauthError && (
+        {/* URL error banner */}
+        {urlErrorMessage && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 7,
+            display: 'flex', alignItems: 'center', gap: 8,
             fontSize: 13, color: 'var(--crm-red)',
             marginBottom: 18,
             padding: '10px 12px',
             background: 'var(--crm-red-dim)',
             borderRadius: 8,
+            border: '1px solid rgba(239,68,68,0.2)',
           }}>
-            <AlertCircle size={14} strokeWidth={2} />
-            Ошибка входа через OAuth. Попробуйте снова.
+            {isAccessDenied
+              ? <ShieldX size={14} strokeWidth={2} style={{ flexShrink: 0 }}/>
+              : <AlertCircle size={14} strokeWidth={2} style={{ flexShrink: 0 }}/>
+            }
+            {urlErrorMessage}
           </div>
         )}
 
