@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle, CreditCard } from 'lucide-react'
 import { createCRMOrder, createCRMPayment } from '@/lib/crm/api'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { ConfirmCloseModal } from '@/components/crm/confirm-close-modal'
 import { ComboboxClient } from '@/components/crm/combobox-client'
 import { ORDER_STATUS_TO_DB } from '@/lib/crm/helpers'
 import type { CRMClient, CRMService, PaymentMethod } from '@/types/crm'
@@ -58,6 +60,7 @@ export function CreateOrderModal({
 }: CreateOrderModalProps) {
   const [form,          setForm]          = useState(EMPTY)
   const [paymentMethod, setPaymentMethod] = useState('')
+  const { showConfirm, handleClose, confirmClose, cancelClose } = useUnsavedChanges()
   const [cardRegion,       setCardRegion]       = useState('')
   const [bankName,         setBankName]         = useState('')
   const [loading,          setLoading]          = useState(false)
@@ -138,14 +141,14 @@ export function CreateOrderModal({
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={(e) => { if (e.target===e.currentTarget) onClose() }}
+      onClick={(e) => { if (e.target===e.currentTarget) handleClose({ ...form, paymentMethod, cardRegion, bankName }, onClose) }}
     >
       <div style={{ width:560,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 
         {/* Header */}
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid var(--crm-border2)',flexShrink:0 }}>
           <span style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)' }}>Создать заказ</span>
-          <button onClick={onClose} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => handleClose({ ...form, paymentMethod, cardRegion, bankName }, onClose)} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)';e.currentTarget.style.color='var(--crm-red)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             <X size={15} strokeWidth={2}/>
@@ -276,7 +279,7 @@ export function CreateOrderModal({
 
         {/* Footer */}
         <div style={{ display:'flex',justifyContent:'flex-end',gap:10,padding:'16px 24px',borderTop:'1px solid var(--crm-border2)',flexShrink:0 }}>
-          <button onClick={onClose} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => handleClose({ ...form, paymentMethod, cardRegion, bankName }, onClose)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-border2)';e.currentTarget.style.color='var(--crm-text)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             Отмена
@@ -298,6 +301,7 @@ export function CreateOrderModal({
           }
         `}</style>
       </div>
+      <ConfirmCloseModal isOpen={showConfirm} onConfirm={() => confirmClose(onClose)} onCancel={cancelClose}/>
     </div>
   )
 }

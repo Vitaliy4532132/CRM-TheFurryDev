@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { createCRMClient, createCRMOrder, updateRequestStatus } from '@/lib/crm/api'
 import { ComboboxClient } from '@/components/crm/combobox-client'
 import { ORDER_STATUS_TO_DB } from '@/lib/crm/helpers'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { ConfirmCloseModal } from '@/components/crm/confirm-close-modal'
 import type { CRMClient, CRMService, CRMRequest } from '@/types/crm'
 
 interface ConvertRequestModalProps {
@@ -41,6 +43,7 @@ export function ConvertRequestModal({
   open, onClose, onSuccess,
   request, displayNum, clients, services, onClientCreated,
 }: ConvertRequestModalProps) {
+  const { showConfirm, handleClose, confirmClose, cancelClose } = useUnsavedChanges()
   const [clientId,       setClientId]       = useState<string | null>(null)
   const [serviceId,      setServiceId]      = useState('')
   const [projectName,    setProjectName]    = useState('')
@@ -128,14 +131,14 @@ export function ConvertRequestModal({
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={e => { if (e.target===e.currentTarget && !loading) onClose() }}
+      onClick={e => { if (e.target===e.currentTarget && !loading) { createdOrderId ? onClose() : handleClose({ clientId, projectName, amount, deadline, comment }, onClose) } }}
     >
       <div style={{ width:560,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 
         {/* Header */}
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid var(--crm-border2)',flexShrink:0 }}>
           <span style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)' }}>Конвертировать заявку в заказ</span>
-          <button onClick={onClose} disabled={loading} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => !loading && (createdOrderId ? onClose() : handleClose({ clientId, projectName, amount, deadline, comment }, onClose))} disabled={loading} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)';e.currentTarget.style.color='var(--crm-red)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             <X size={15} strokeWidth={2}/>
@@ -222,7 +225,7 @@ export function ConvertRequestModal({
             </div>
 
             <div style={{ display:'flex',justifyContent:'flex-end',gap:10,padding:'16px 24px',borderTop:'1px solid var(--crm-border2)',flexShrink:0 }}>
-              <button onClick={onClose} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
+              <button onClick={() => !loading && handleClose({ clientId, projectName, amount, deadline, comment }, onClose)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
                 onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-border2)';e.currentTarget.style.color='var(--crm-text)'}}
                 onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
                 Отмена
@@ -241,6 +244,7 @@ export function ConvertRequestModal({
 
         <style>{`select option{background:var(--crm-s3);color:var(--crm-text)}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
+      <ConfirmCloseModal isOpen={showConfirm} onConfirm={() => confirmClose(onClose)} onCancel={cancelClose}/>
     </div>
   )
 }

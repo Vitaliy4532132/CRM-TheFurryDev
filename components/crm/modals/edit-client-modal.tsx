@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 import { updateCRMClient } from '@/lib/crm/api'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { ConfirmCloseModal } from '@/components/crm/confirm-close-modal'
 import type { CRMClient } from '@/types/crm'
 
 interface EditClientModalProps {
@@ -41,6 +43,7 @@ function ub(e: React.FocusEvent<HTMLElement>) {
 }
 
 export function EditClientModal({ open, onClose, onSuccess, client }: EditClientModalProps) {
+  const { showConfirm, handleClose, confirmClose, cancelClose } = useUnsavedChanges()
   const [form, setForm]       = useState({ name: '', telegram: '', discord: '', email: '', country: '', note: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
@@ -104,7 +107,7 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 1000, backdropFilter: 'blur(2px)',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(form, onClose) }}
     >
       <div style={{
         width: 480, maxHeight: '90vh', overflowY: 'auto',
@@ -123,7 +126,7 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
             Редактировать клиента
           </span>
           <button
-            onClick={onClose}
+            onClick={() => handleClose(form, onClose)}
             style={{
               width: 30, height: 30, borderRadius: 8,
               background: 'var(--crm-s3)', border: 'none', cursor: 'pointer',
@@ -188,7 +191,7 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
           padding: '16px 24px', borderTop: '1px solid var(--crm-border2)', flexShrink: 0,
         }}>
           <button
-            onClick={onClose}
+            onClick={() => handleClose(form, onClose)}
             disabled={loading}
             style={{
               height: 36, padding: '0 18px', borderRadius: 8,
@@ -228,6 +231,7 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
         </div>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <ConfirmCloseModal isOpen={showConfirm} onConfirm={() => confirmClose(onClose)} onCancel={cancelClose}/>
     </div>
   )
 }

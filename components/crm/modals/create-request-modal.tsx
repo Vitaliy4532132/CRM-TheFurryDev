@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 import { createRequest } from '@/lib/crm/api'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { ConfirmCloseModal } from '@/components/crm/confirm-close-modal'
 import type { CRMRequest, RequestSource, RequestStatus } from '@/types/crm'
 
 interface CreateRequestModalProps {
@@ -30,6 +32,7 @@ function ub(e: React.FocusEvent<HTMLElement>) { (e.currentTarget as HTMLElement)
 const EMPTY = { name: '', telegram: '', discord: '', source: 'telegram' as RequestSource, service: '', budget: '', description: '', status: 'new' as RequestStatus }
 
 export function CreateRequestModal({ open, onClose, onSuccess }: CreateRequestModalProps) {
+  const { showConfirm, handleClose, confirmClose, cancelClose } = useUnsavedChanges()
   const [form,    setForm]    = useState(EMPTY)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
@@ -77,14 +80,14 @@ export function CreateRequestModal({ open, onClose, onSuccess }: CreateRequestMo
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={e => { if (e.target === e.currentTarget && !loading) onClose() }}
+      onClick={e => { if (e.target === e.currentTarget && !loading) handleClose({ name: form.name, telegram: form.telegram, discord: form.discord, service: form.service, budget: form.budget, description: form.description }, onClose) }}
     >
       <div style={{ width:520,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 
         {/* Header */}
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid var(--crm-border2)',flexShrink:0 }}>
           <span style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)' }}>Добавить заявку</span>
-          <button onClick={onClose} disabled={loading} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => !loading && handleClose({ name: form.name, telegram: form.telegram, discord: form.discord, service: form.service, budget: form.budget, description: form.description }, onClose)} disabled={loading} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)';e.currentTarget.style.color='var(--crm-red)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             <X size={15} strokeWidth={2}/>
@@ -152,7 +155,7 @@ export function CreateRequestModal({ open, onClose, onSuccess }: CreateRequestMo
 
         {/* Footer */}
         <div style={{ display:'flex',justifyContent:'flex-end',gap:10,padding:'16px 24px',borderTop:'1px solid var(--crm-border2)',flexShrink:0 }}>
-          <button onClick={onClose} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => !loading && handleClose({ name: form.name, telegram: form.telegram, discord: form.discord, service: form.service, budget: form.budget, description: form.description }, onClose)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-border2)';e.currentTarget.style.color='var(--crm-text)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             Отмена
@@ -166,6 +169,7 @@ export function CreateRequestModal({ open, onClose, onSuccess }: CreateRequestMo
 
         <style>{`select option{background:var(--crm-s3);color:var(--crm-text)}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
+      <ConfirmCloseModal isOpen={showConfirm} onConfirm={() => confirmClose(onClose)} onCancel={cancelClose}/>
     </div>
   )
 }

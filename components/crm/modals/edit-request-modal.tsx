@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 import { updateRequest } from '@/lib/crm/api'
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
+import { ConfirmCloseModal } from '@/components/crm/confirm-close-modal'
 import type { CRMRequest, RequestSource, RequestStatus } from '@/types/crm'
 
 interface EditRequestModalProps {
@@ -28,6 +30,7 @@ function fb(e: React.FocusEvent<HTMLElement>) { (e.currentTarget as HTMLElement)
 function ub(e: React.FocusEvent<HTMLElement>) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--crm-border2)' }
 
 export function EditRequestModal({ request, onClose, onSuccess }: EditRequestModalProps) {
+  const { showConfirm, handleClose, confirmClose, cancelClose } = useUnsavedChanges()
   const [name,        setName]        = useState('')
   const [telegram,    setTelegram]    = useState('')
   const [discord,     setDiscord]     = useState('')
@@ -88,14 +91,14 @@ export function EditRequestModal({ request, onClose, onSuccess }: EditRequestMod
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={e => { if (e.target === e.currentTarget && !loading) onClose() }}
+      onClick={e => { if (e.target === e.currentTarget && !loading) handleClose({ name, telegram, discord, service, description, budget }, onClose) }}
     >
       <div style={{ width:520,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 
         {/* Header */}
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid var(--crm-border2)',flexShrink:0 }}>
           <span style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)' }}>Редактировать заявку</span>
-          <button onClick={onClose} disabled={loading} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => !loading && handleClose({ name, telegram, discord, service, description, budget }, onClose)} disabled={loading} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)';e.currentTarget.style.color='var(--crm-red)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             <X size={15} strokeWidth={2}/>
@@ -159,7 +162,7 @@ export function EditRequestModal({ request, onClose, onSuccess }: EditRequestMod
 
         {/* Footer */}
         <div style={{ display:'flex',justifyContent:'flex-end',gap:10,padding:'16px 24px',borderTop:'1px solid var(--crm-border2)',flexShrink:0 }}>
-          <button onClick={onClose} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => !loading && handleClose({ name, telegram, discord, service, description, budget }, onClose)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-border2)';e.currentTarget.style.color='var(--crm-text)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             Отмена
@@ -173,6 +176,7 @@ export function EditRequestModal({ request, onClose, onSuccess }: EditRequestMod
 
         <style>{`select option{background:var(--crm-s3);color:var(--crm-text)}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
+      <ConfirmCloseModal isOpen={showConfirm} onConfirm={() => confirmClose(onClose)} onCancel={cancelClose}/>
     </div>
   )
 }
