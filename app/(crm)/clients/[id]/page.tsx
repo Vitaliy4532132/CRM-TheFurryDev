@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -182,6 +182,18 @@ export default function ClientCardPage() {
     }
     load()
   }, [id])
+
+  // ── Refresh after payment changes ─────────────────────────────────────────
+
+  const refreshOrdersAndPayments = useCallback(async () => {
+    if (!client) return
+    const [updatedOrders, updatedPayments] = await Promise.all([
+      getOrdersByClient(id),
+      getPaymentsByClient(id),
+    ])
+    setOrders(updatedOrders)
+    setPayments(updatedPayments)
+  }, [id, client])
 
   // ── Stats ──────────────────────────────────────────────────────────────────
 

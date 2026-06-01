@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
-import { createCRMPayment, updateCRMOrder } from '@/lib/crm/api'
+import { createCRMPayment } from '@/lib/crm/api'
 import type { CRMOrder, PaymentMethod } from '@/types/crm'
 
 interface CreatePaymentModalProps {
@@ -118,6 +118,7 @@ export function CreatePaymentModal({
     setLoading(true); setError(null)
     try {
       const method = resolveMethod(payType, cardType)
+      // Trigger recalculate_order_paid handles paid update automatically
       await createCRMPayment({
         order_id:       effectiveOrderId,
         client_id:      effectiveClientId,
@@ -126,9 +127,6 @@ export function CreatePaymentModal({
         payment_date:   date || new Date().toISOString().split('T')[0],
         comment:        buildComment(),
       })
-      if (selectMode && selectedOrder) {
-        await updateCRMOrder(selectedOrder.id, { paid: selectedOrder.paid + num })
-      }
       onSuccess(num)
       onClose()
     } catch (e) {

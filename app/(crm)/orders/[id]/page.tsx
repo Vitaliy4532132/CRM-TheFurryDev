@@ -148,12 +148,15 @@ export default function OrderCardPage() {
     } finally { setCompleting(false) }
   }
 
-  async function handlePaymentCreated(amount: number) {
+  async function handlePaymentCreated(_amount: number) {
     if (!order) return
-    const updated = await updateCRMOrder(order.id, { paid: order.paid + amount })
-    setOrder(updated)
-    const p = await getPaymentsByOrder(id)
-    setPayments(p)
+    // Trigger recalculate_order_paid handles paid update — just reload fresh data
+    const [updatedOrder, updatedPayments] = await Promise.all([
+      getOrderById(id),
+      getPaymentsByOrder(id),
+    ])
+    setOrder(updatedOrder)
+    setPayments(updatedPayments)
   }
 
   const refreshClients = useCallback(async () => { const c = await getClients(); setClients(c) }, [])
