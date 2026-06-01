@@ -212,6 +212,62 @@ export async function getPayments(): Promise<CRMPayment[]> {
   return data ?? []
 }
 
+// ─── SITE DATA (balance_transactions, purchases, profiles) ───────────────────
+
+export type BalanceTx = {
+  id:          string
+  user_id:     string
+  type:        string
+  amount:      number
+  description: string | null
+  created_at:  string
+}
+
+export type SitePurchase = {
+  id:         string
+  user_id:    string
+  amount:     number
+  created_at: string
+  product:    { id: string; name: string; price: number; slug: string } | null
+}
+
+export type SiteProfile = {
+  balance:  number
+  nickname: string
+}
+
+export async function getClientTransactions(profileId: string): Promise<BalanceTx[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('balance_transactions')
+    .select('*')
+    .eq('user_id', profileId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function getClientPurchases(profileId: string): Promise<SitePurchase[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('*, product:products(id, name, price, slug)')
+    .eq('user_id', profileId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as SitePurchase[]
+}
+
+export async function getSiteProfile(profileId: string): Promise<SiteProfile | null> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('profiles')
+    .select('balance, nickname')
+    .eq('id', profileId)
+    .single()
+  return data
+}
+
 export async function getPaymentsByClient(clientId: string): Promise<CRMPayment[]> {
   const supabase = createClient()
   const { data, error } = await supabase
