@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   ArrowLeft, Send, Mail, MapPin, Calendar,
   MessageSquare, ClipboardList, Globe, Pencil, Loader2, AlertCircle,
-  Wallet, Package, ArrowDownCircle, ShoppingCart,
+  Wallet, Package, ArrowDownCircle, ShoppingCart, TrendingUp,
 } from 'lucide-react'
 import {
   getClientById, getOrdersByClient, getPaymentsByClient, updateCRMClient,
@@ -185,10 +185,11 @@ export default function ClientCardPage() {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
 
-  const totalOrders = orders.length
-  const totalAmount = orders.reduce((s, o) => s + o.amount, 0)
-  const totalUnpaid = orders.reduce((s, o) => s + Math.max(0, o.amount - o.paid), 0)
-  const preferred   = useMemo(() => getPreferredPayment(payments), [payments])
+  const totalOrders    = orders.length
+  const totalAmount    = orders.reduce((s, o) => s + o.amount, 0)
+  const totalUnpaid    = orders.reduce((s, o) => s + Math.max(0, o.amount - o.paid), 0)
+  const totalOverall   = (client?.total_spent ?? 0) + totalAmount
+  const preferred      = useMemo(() => getPreferredPayment(payments), [payments])
 
   // Site stats
   const topupCount   = transactions.filter(t => t.type === 'admin' && t.amount > 0).length
@@ -354,11 +355,23 @@ export default function ClientCardPage() {
 
           {/* ── Stats ── */}
           <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12 }}>
+            {/* Общая сумма — highlighted */}
+            <div style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-green-dim)',borderRadius:12,padding:'18px 20px' }}>
+              <div style={{ display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--crm-muted)',marginBottom:8 }}>
+                <TrendingUp size={12} strokeWidth={2} style={{ color:'var(--crm-green)',flexShrink:0 }}/>
+                Общая сумма
+              </div>
+              <div style={{ fontSize:24,fontWeight:700,color:'var(--crm-green)',letterSpacing:'-0.02em' }}>
+                {money(totalOverall)}
+              </div>
+              <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:4 }}>сайт + заказы CRM</div>
+            </div>
+
+            {/* Regular stats */}
             {[
-              { label:'Всего заказов',      value:String(totalOrders),            color:'var(--crm-blue)',   icon:null },
-              { label:'Общая сумма',         value:money(totalAmount),             color:'var(--crm-green)',  icon:null },
-              { label:'Неоплачено',          value:money(totalUnpaid),             color:'var(--crm-red)',    icon:null },
-              { label:'Поповнено на сайті',  value:money(client.total_spent ?? 0), color:'var(--crm-purple)', icon:Wallet },
+              { label:'Всего заказов',       value:String(totalOrders),            color:'var(--crm-blue)',   icon:null },
+              { label:'Неоплачено',           value:money(totalUnpaid),             color:'var(--crm-red)',    icon:null },
+              { label:'Пополнено на сайте',   value:money(client.total_spent ?? 0), color:'var(--crm-purple)', icon:Wallet },
             ].map(s => (
               <div key={s.label} style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:12,padding:'18px 20px' }}>
                 <div style={{ display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--crm-muted)',marginBottom:8 }}>
@@ -366,8 +379,8 @@ export default function ClientCardPage() {
                   {s.label}
                 </div>
                 <div style={{ fontSize:24,fontWeight:700,color:s.color,letterSpacing:'-0.02em' }}>{s.value}</div>
-                {s.label === 'Поповнено на сайті' && (
-                  <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:4 }}>реальних надходжень</div>
+                {s.label === 'Пополнено на сайте' && (
+                  <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:4 }}>реальных поступлений</div>
                 )}
               </div>
             ))}
@@ -380,12 +393,12 @@ export default function ClientCardPage() {
               <div>
                 <div style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)',marginBottom:12,display:'flex',alignItems:'center',gap:8 }}>
                   <Globe size={16} color="var(--crm-teal)" strokeWidth={2}/>
-                  Активність на сайті
+                  Активность на сайте
                 </div>
                 <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12 }}>
-                  <MiniStat label="Поповнень балансу" value={String(topupCount)}    icon={Wallet}       color="#22c55e"/>
-                  <MiniStat label="Витрачено з балансу" value={money(spendTotal)}   icon={ShoppingCart} color="#a855f7"/>
-                  <MiniStat label="Куплено продуктів"  value={String(sitePurchases.length)} icon={Package} color="#3b82f6"/>
+                  <MiniStat label="Пополнений баланса"  value={String(topupCount)}            icon={Wallet}       color="#22c55e"/>
+                  <MiniStat label="Потрачено с баланса" value={money(spendTotal)}              icon={ShoppingCart} color="#a855f7"/>
+                  <MiniStat label="Куплено продуктов"   value={String(sitePurchases.length)}   icon={Package}      color="#3b82f6"/>
                 </div>
               </div>
 
@@ -395,7 +408,7 @@ export default function ClientCardPage() {
                 {/* Balance card */}
                 <div style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:12,padding:'18px 20px' }}>
                   <div style={{ fontSize:11,fontWeight:600,color:'var(--crm-muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:12 }}>
-                    Баланс на сайті
+                    Баланс на сайте
                   </div>
                   {siteProfile ? (
                     <>
@@ -410,17 +423,17 @@ export default function ClientCardPage() {
                       </div>
                     </>
                   ) : (
-                    <div style={{ fontSize:13,color:'var(--crm-muted)' }}>Завантаження...</div>
+                    <div style={{ fontSize:13,color:'var(--crm-muted)' }}>Загрузка...</div>
                   )}
                 </div>
 
                 {/* Topups list */}
                 <div style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:12,overflow:'hidden' }}>
                   <div style={{ padding:'14px 16px',borderBottom:'1px solid var(--crm-border2)',fontSize:13,fontWeight:700,color:'var(--crm-text)' }}>
-                    Поповнення на сайті
+                    Пополнения на сайте
                   </div>
                   {topups.length === 0 ? (
-                    <div style={{ padding:'24px',textAlign:'center',fontSize:13,color:'var(--crm-muted)' }}>Поповнень ще немає</div>
+                    <div style={{ padding:'24px',textAlign:'center',fontSize:13,color:'var(--crm-muted)' }}>Пополнений ещё нет</div>
                   ) : (
                     <>
                       {shownTopups.map((tx, i) => (
@@ -432,7 +445,7 @@ export default function ClientCardPage() {
                           </div>
                           <div style={{ flex:1,minWidth:0 }}>
                             <div style={{ fontSize:13,color:'var(--crm-text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
-                              {tx.description ?? 'Поповнення балансу'}
+                              {tx.description ?? 'Пополнение баланса'}
                             </div>
                             <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:2 }}>{formatDate(tx.created_at)}</div>
                           </div>
@@ -444,7 +457,7 @@ export default function ClientCardPage() {
                       {topups.length > 5 && (
                         <div style={{ padding:'10px 16px',borderTop:'1px solid var(--crm-border2)',textAlign:'center' }}>
                           <button onClick={()=>setShowAllTopups(v=>!v)} style={{ fontSize:13,color:'var(--crm-blue)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:500 }}>
-                            {showAllTopups ? 'Приховати' : `Показати всі (${topups.length})`}
+                            {showAllTopups ? 'Свернуть' : `Показать все (${topups.length})`}
                           </button>
                         </div>
                       )}
@@ -457,12 +470,12 @@ export default function ClientCardPage() {
               <div>
                 <h2 style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)',margin:'0 0 12px 0',display:'flex',alignItems:'center',gap:8 }}>
                   <Package size={16} color="var(--crm-blue)" strokeWidth={2}/>
-                  Куплені продукти на сайті
+                  Купленные продукты на сайте
                 </h2>
                 {sitePurchases.length === 0 ? (
                   <div style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:12,padding:'40px 24px',textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:10 }}>
                     <Package size={36} color="var(--crm-muted)" strokeWidth={1.25}/>
-                    <div style={{ fontSize:14,fontWeight:600,color:'var(--crm-text)' }}>Покупок на сайті ще немає</div>
+                    <div style={{ fontSize:14,fontWeight:600,color:'var(--crm-text)' }}>Покупок на сайте ещё нет</div>
                   </div>
                 ) : (
                   <div style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:12,overflow:'hidden' }}>
@@ -470,7 +483,7 @@ export default function ClientCardPage() {
                       <thead style={{ background:'var(--crm-s3)' }}>
                         <tr>
                           <th style={thStyle}>Продукт</th>
-                          <th style={thStyle}>Сума</th>
+                          <th style={thStyle}>Сумма</th>
                           <th style={thStyle}>Дата</th>
                         </tr>
                       </thead>
@@ -480,7 +493,7 @@ export default function ClientCardPage() {
                             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
                             onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
                             <td style={{ padding:'11px 14px',fontSize:13,color:'var(--crm-text)' }}>
-                              {(p.product?.name ?? 'Невідомий продукт').slice(0, 40)}
+                              {(p.product?.name ?? 'Неизвестный продукт').slice(0, 40)}
                             </td>
                             <td style={{ padding:'11px 14px',fontSize:13,fontWeight:700,color:'var(--crm-purple)',whiteSpace:'nowrap' }}>
                               {money(p.amount)}
@@ -503,8 +516,8 @@ export default function ClientCardPage() {
                 <Globe size={18} color="var(--crm-muted)" strokeWidth={1.75}/>
               </div>
               <div>
-                <div style={{ fontSize:13,fontWeight:600,color:'var(--crm-text)',marginBottom:3 }}>Клієнт не зареєстрований на сайті</div>
-                <div style={{ fontSize:12,color:'var(--crm-muted)' }}>Немає прив&apos;язки до профілю thefurry.store</div>
+                <div style={{ fontSize:13,fontWeight:600,color:'var(--crm-text)',marginBottom:3 }}>Клиент не зарегистрирован на сайте</div>
+                <div style={{ fontSize:12,color:'var(--crm-muted)' }}>Нет привязки к профилю thefurry.store</div>
               </div>
             </div>
           )}
