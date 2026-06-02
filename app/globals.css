@@ -73,3 +73,26 @@
     color: var(--crm-blue);
   }
 }
+
+/* ── Privacy mode — blur all sensitive numbers ──────────────────────────── */
+
+.crm-sensitive {
+  filter: blur(0px);
+  transition: filter 0.3s ease;
+  display: inline-block;
+}
+
+[data-privacy="true"] .crm-sensitive {
+  filter: blur(8px);
+  user-select: none;
+  transition: filter 0.2s ease;
+  cursor: pointer;
+}
+
+[data-privacy="true"] .crm-sensitive:hover {
+  filter: blur(4px);
+}
+
+[data-privacy="true"] .crm-sensitive:active {
+  filter: blur(0px);
+}

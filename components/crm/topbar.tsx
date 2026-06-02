@@ -2,9 +2,10 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useRef, useState, useEffect, useCallback, Suspense } from 'react'
-import { Search, Plus, Loader2, ClipboardList, Users, SearchX } from 'lucide-react'
+import { Search, Plus, Loader2, ClipboardList, Users, SearchX, Eye, EyeOff } from 'lucide-react'
 import { globalSearch, type SearchOrderResult, type SearchClientResult } from '@/lib/crm/api'
 import { ORDER_STATUS_LABELS } from '@/lib/crm/helpers'
+import { usePrivacyMode } from '@/hooks/usePrivacyMode'
 
 // ── Status badge (mini) ───────────────────────────────────────────────────────
 
@@ -239,6 +240,8 @@ function TopbarInner({ userEmail }: TopbarProps) {
 
   const displayName = userEmail ? userEmail.split('@')[0] : 'Админ'
 
+  const { isPrivate, toggle } = usePrivacyMode()
+
   const handleCreateOrder = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('modal', 'create-order')
@@ -255,6 +258,43 @@ function TopbarInner({ userEmail }: TopbarProps) {
       <h1 style={{ fontSize:17,fontWeight:700,color:'var(--crm-text)',flex:1,margin:0 }}>
         {title}
       </h1>
+
+      {/* Privacy toggle */}
+      <button
+        onClick={toggle}
+        title={isPrivate ? 'Показать цифры' : 'Скрыть цифры'}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          background: isPrivate ? 'var(--crm-blue-dim)' : 'var(--crm-surface)',
+          border: `1px solid ${isPrivate ? 'var(--crm-blue)' : 'var(--crm-border2)'}`,
+          borderRadius: '8px',
+          padding: '7px 12px',
+          color: isPrivate ? 'var(--crm-blue)' : 'var(--crm-muted)',
+          cursor: 'pointer',
+          fontSize: '13px',
+          fontWeight: 500,
+          transition: 'all 0.15s',
+          whiteSpace: 'nowrap',
+          fontFamily: 'inherit',
+        }}
+        onMouseEnter={e => {
+          if (!isPrivate) {
+            e.currentTarget.style.borderColor = 'var(--crm-blue)'
+            e.currentTarget.style.color = 'var(--crm-blue)'
+          }
+        }}
+        onMouseLeave={e => {
+          if (!isPrivate) {
+            e.currentTarget.style.borderColor = 'var(--crm-border2)'
+            e.currentTarget.style.color = 'var(--crm-muted)'
+          }
+        }}
+      >
+        {isPrivate ? <EyeOff size={15}/> : <Eye size={15}/>}
+        {isPrivate ? 'Показать' : 'Скрыть'}
+      </button>
 
       {/* Search */}
       <SearchBox />

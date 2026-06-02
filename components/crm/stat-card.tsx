@@ -10,6 +10,7 @@ interface StatCardProps {
   sub?: string
   delta?: string
   deltaPositive?: boolean
+  sensitive?: boolean
 }
 
 export function StatCard({
@@ -22,6 +23,7 @@ export function StatCard({
   sub,
   delta,
   deltaPositive,
+  sensitive,
 }: StatCardProps) {
   return (
     <div
@@ -83,13 +85,14 @@ export function StatCard({
           marginBottom: 8,
         }}
       >
-        {value}
+        {sensitive ? <span className="crm-sensitive">{value}</span> : value}
       </div>
 
       {/* Footer: sub or delta */}
       <div style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
         {delta && (
           <span
+            className={sensitive ? 'crm-sensitive' : undefined}
             style={{
               color: deltaPositive ? 'var(--crm-green)' : 'var(--crm-red)',
               fontWeight: 600,

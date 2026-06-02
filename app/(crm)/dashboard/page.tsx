@@ -27,6 +27,10 @@ function OrderStatusBadge({ status }: { status: string }) {
   return <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:cfg.color,background:cfg.bg }}>{ORDER_STATUS_LABELS[status] ?? status}</span>
 }
 
+function SensitiveValue({ children }: { children: React.ReactNode }) {
+  return <span className="crm-sensitive">{children}</span>
+}
+
 function PaymentChip({ amount, paid }: { amount: number; paid: number }) {
   const label = paid === 0 ? 'Не оплачен' : paid >= amount ? 'Оплачен' : 'Частично'
   const color = paid === 0 ? 'var(--crm-red)' : paid >= amount ? 'var(--crm-green)' : 'var(--crm-orange)'
@@ -53,13 +57,13 @@ function OrderRow({ order, isLast }: { order: CRMOrder; isLast: boolean }) {
         {order.service?.name ?? '—'}
       </td>
       <td style={{ padding:'13px 16px',fontSize:13,fontWeight:700,color:'var(--crm-text)',whiteSpace:'nowrap' }}>
-        {formatMoney(order.amount)}
+        <SensitiveValue>{formatMoney(order.amount)}</SensitiveValue>
       </td>
       <td style={{ padding:'13px 16px' }}>
         <OrderStatusBadge status={order.status}/>
       </td>
       <td style={{ padding:'13px 16px' }}>
-        <PaymentChip amount={order.amount} paid={order.paid}/>
+        <SensitiveValue><PaymentChip amount={order.amount} paid={order.paid}/></SensitiveValue>
       </td>
       <td style={{ padding:'13px 16px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
         {formatDate(order.created_at)}
@@ -99,10 +103,10 @@ export default function DashboardPage() {
       <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12 }}>
         {loading ? [0,1,2,3].map(i=><StatSkel key={i}/>) : (
           <>
-            <StatCard label="Всего заказов"  value={stats?.totalOrders ?? 0}     icon={ClipboardList} iconColor="var(--crm-blue)"   iconBg="var(--crm-blue-dim)"   sub="за всё время"/>
-            <StatCard label="Активные"       value={stats?.activeOrders ?? 0}    icon={Clock}         iconColor="var(--crm-orange)"  iconBg="var(--crm-orange-dim)"  sub="в работе"/>
-            <StatCard label="Завершённые"    value={stats?.completedOrders ?? 0} icon={CheckCircle}   iconColor="var(--crm-teal)"    iconBg="var(--crm-teal-dim)"    sub="всего"/>
-            <StatCard label="Новые заказы"   value={stats?.newOrders ?? 0}       icon={Sparkles}      iconColor="var(--crm-purple)"  iconBg="var(--crm-purple-dim)"  sub="ожидают начала"/>
+            <StatCard label="Всего заказов"  value={stats?.totalOrders ?? 0}     icon={ClipboardList} iconColor="var(--crm-blue)"   iconBg="var(--crm-blue-dim)"   sub="за всё время"    sensitive/>
+            <StatCard label="Активные"       value={stats?.activeOrders ?? 0}    icon={Clock}         iconColor="var(--crm-orange)"  iconBg="var(--crm-orange-dim)"  sub="в работе"        sensitive/>
+            <StatCard label="Завершённые"    value={stats?.completedOrders ?? 0} icon={CheckCircle}   iconColor="var(--crm-teal)"    iconBg="var(--crm-teal-dim)"    sub="всего"           sensitive/>
+            <StatCard label="Новые заказы"   value={stats?.newOrders ?? 0}       icon={Sparkles}      iconColor="var(--crm-purple)"  iconBg="var(--crm-purple-dim)"  sub="ожидают начала"  sensitive/>
           </>
         )}
       </div>
@@ -111,10 +115,10 @@ export default function DashboardPage() {
       <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12 }}>
         {loading ? [0,1,2,3].map(i=><StatSkel key={i}/>) : (
           <>
-            <StatCard label="Доход за месяц"     value={formatMoney(stats?.monthIncome  ?? 0)} icon={TrendingUp}    iconColor="var(--crm-green)"  iconBg="var(--crm-green-dim)"  valueColor="var(--crm-green)"/>
-            <StatCard label="Расходы за месяц"   value={formatMoney(stats?.monthExpense ?? 0)} icon={TrendingDown}  iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"/>
-            <StatCard label="Прибыль за месяц"   value={formatMoney(stats?.monthProfit  ?? 0)} icon={BarChart2}     iconColor="var(--crm-teal)"   iconBg="var(--crm-teal-dim)"   valueColor="var(--crm-teal)"/>
-            <StatCard label="Неоплачено"         value={formatMoney(stats?.totalDebt    ?? 0)} icon={AlertTriangle} iconColor="var(--crm-yellow)" iconBg="var(--crm-yellow-dim)" valueColor="var(--crm-yellow)" sub="ожидает оплаты"/>
+            <StatCard label="Доход за месяц"     value={formatMoney(stats?.monthIncome  ?? 0)} icon={TrendingUp}    iconColor="var(--crm-green)"  iconBg="var(--crm-green-dim)"  valueColor="var(--crm-green)"  sensitive/>
+            <StatCard label="Расходы за месяц"   value={formatMoney(stats?.monthExpense ?? 0)} icon={TrendingDown}  iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    sensitive/>
+            <StatCard label="Прибыль за месяц"   value={formatMoney(stats?.monthProfit  ?? 0)} icon={BarChart2}     iconColor="var(--crm-teal)"   iconBg="var(--crm-teal-dim)"   valueColor="var(--crm-teal)"   sensitive/>
+            <StatCard label="Неоплачено"         value={formatMoney(stats?.totalDebt    ?? 0)} icon={AlertTriangle} iconColor="var(--crm-yellow)" iconBg="var(--crm-yellow-dim)" valueColor="var(--crm-yellow)" sub="ожидает оплаты" sensitive/>
           </>
         )}
       </div>
