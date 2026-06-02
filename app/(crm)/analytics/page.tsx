@@ -20,7 +20,8 @@ import type { CRMPayment, CRMExpense, CRMOrder, CRMClient, CRMRequest } from '@/
 type ProductStatRow = {
   amount: number
   created_at: string
-  product: { id: string; name: string; price: number; slug: string; is_plugin: boolean } | null
+  product_id: string | null
+  product: { id: string; name: string; price: number; slug: string; is_plugin: boolean; status: string } | null
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -301,9 +302,11 @@ export default function AnalyticsPage() {
   const productsList = useMemo(() => {
     const map: Record<string, { name: string; slug: string; is_plugin: boolean; count: number; total: number; lastSale: string }> = {}
     fProducts.forEach(p => {
-      const id   = p.product?.id   ?? 'unknown'
-      const name = p.product?.name ?? 'Неизвестный продукт'
-      if (!map[id]) map[id] = { name, slug: p.product?.slug ?? '', is_plugin: p.product?.is_plugin ?? false, count: 0, total: 0, lastSale: p.created_at }
+      const id       = p.product?.id ?? p.product_id ?? 'unknown'
+      const name     = p.product?.name ?? 'Удалённый продукт'
+      const slug     = p.product?.slug ?? '—'
+      const is_plugin = p.product?.is_plugin ?? false
+      if (!map[id]) map[id] = { name, slug, is_plugin, count: 0, total: 0, lastSale: p.created_at }
       map[id].count += 1
       map[id].total += Number(p.amount)
       if (p.created_at > map[id].lastSale) map[id].lastSale = p.created_at

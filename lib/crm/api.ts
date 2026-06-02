@@ -431,7 +431,15 @@ export async function getProductsStats() {
     .select(`
       amount,
       created_at,
-      product:products(id, name, price, slug, is_plugin)
+      product_id,
+      product:products(
+        id,
+        name,
+        price,
+        slug,
+        is_plugin,
+        status
+      )
     `)
     .order('created_at', { ascending: false })
   if (error) throw error
