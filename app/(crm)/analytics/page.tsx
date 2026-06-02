@@ -4,17 +4,24 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   TrendingUp, TrendingDown, BarChart2, UserPlus,
   Trophy, Calculator, Star, Target, Clock, AlertTriangle, BarChart3,
+  ShoppingBag, Code, Package,
 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { getPayments, getExpenses, getOrders, getClients, getRequests } from '@/lib/crm/api'
+import { getPayments, getExpenses, getOrders, getClients, getRequests, getProductsStats } from '@/lib/crm/api'
 import {
-  formatMoney, getDateRange, getPrevDateRange,
+  formatMoney, formatDate, getDateRange, getPrevDateRange,
   getGrouping, getBucketLabel, getBucketMs,
 } from '@/lib/crm/helpers'
 import type { CRMPayment, CRMExpense, CRMOrder, CRMClient, CRMRequest } from '@/types/crm'
+
+type ProductStatRow = {
+  amount: number
+  created_at: string
+  product: { id: string; name: string; price: number; slug: string; is_plugin: boolean } | null
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -247,11 +254,12 @@ export default function AnalyticsPage() {
   const [requests,  setRequests]  = useState<CRMRequest[]>([])
   const [loading,   setLoading]   = useState(true)
   const [showAllPayments, setShowAllPayments] = useState(false)
+  const [productsRaw, setProductsRaw] = useState<ProductStatRow[]>([])
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([getPayments(), getExpenses(), getOrders(), getClients(), getRequests()])
-      .then(([p, e, o, c, r]) => { setPayments(p); setExpenses(e); setOrders(o); setClients(c); setRequests(r) })
+    Promise.all([getPayments(), getExpenses(), getOrders(), getClients(), getRequests(), getProductsStats()])
+      .then(([p, e, o, c, r, ps]) => { setPayments(p); setExpenses(e); setOrders(o); setClients(c); setRequests(r); setProductsRaw(ps as unknown as ProductStatRow[]) })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -267,7 +275,8 @@ export default function AnalyticsPage() {
   const fe = useMemo(() => expenses.filter(e => inRange(e.date, from, to)),            [expenses, from, to])
   const fo = useMemo(() => orders.filter(o => inRange(o.created_at, from, to)),        [orders, from, to])
   const fc = useMemo(() => clients.filter(c => inRange(c.created_at, from, to)),       [clients, from, to])
-  const fr = useMemo(() => requests.filter(r => inRange(r.created_at, from, to)),      [requests, from, to])
+  const fr       = useMemo(() => requests.filter(r => inRange(r.created_at, from, to)),      [requests, from, to])
+  const fProducts = useMemo(() => productsRaw.filter(p => inRange(p.created_at, from, to)), [productsRaw, from, to])
 
   // Previous period
   const pp = useMemo(() => payments.filter(p => inRange(p.payment_date, prev.from, prev.to)), [payments, prev])
@@ -288,6 +297,19 @@ export default function AnalyticsPage() {
   const dayOfWeekData  = useMemo(() => buildDayOfWeek(fp),                     [fp])
   const pieData        = useMemo(() => buildExpensesByCategory(fe),             [fe])
   const topClients     = useMemo(() => buildTopClients(fp, clients),            [fp, clients])
+
+  const productsList = useMemo(() => {
+    const map: Record<string, { name: string; slug: string; is_plugin: boolean; count: number; total: number; lastSale: string }> = {}
+    fProducts.forEach(p => {
+      const id   = p.product?.id   ?? 'unknown'
+      const name = p.product?.name ?? 'Неизвестный продукт'
+      if (!map[id]) map[id] = { name, slug: p.product?.slug ?? '', is_plugin: p.product?.is_plugin ?? false, count: 0, total: 0, lastSale: p.created_at }
+      map[id].count += 1
+      map[id].total += Number(p.amount)
+      if (p.created_at > map[id].lastSale) map[id].lastSale = p.created_at
+    })
+    return Object.values(map).sort((a, b) => b.total - a.total)
+  }, [fProducts])
 
   // Highlight max bar in day-of-week chart
   const maxDayIncome = useMemo(() => Math.max(...dayOfWeekData.map(d => d.income)), [dayOfWeekData])
@@ -535,6 +557,173 @@ export default function AnalyticsPage() {
           )}
         </ChartBox>
       )}
+
+      {/* ── Product stats ── */}
+      <div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 12 }}>Доход по продуктам</div>
+        {loading ? (
+          <div style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 12, padding: 20 }}>
+            <Skel w={180} h={16}/><div style={{ marginTop: 16 }}><ChartSkel h={240}/></div>
+          </div>
+        ) : fProducts.length === 0 ? (
+          <div style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 12, padding: '48px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <ShoppingBag size={48} color="var(--crm-muted)" strokeWidth={1.25}/>
+            <div style={{ fontSize: 13, color: 'var(--crm-muted)' }}>Нет данных о продуктах за этот период</div>
+          </div>
+        ) : (
+          <>
+            {/* Table + Charts grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '7fr 3fr', gap: 16 }}>
+
+              {/* Table */}
+              <div style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ background: 'var(--crm-s3)' }}>
+                      <tr>
+                        <th style={thStyle}>Продукт</th>
+                        <th style={thStyle}>Тип</th>
+                        <th style={thStyle}>Продаж</th>
+                        <th style={thStyle}>Доход</th>
+                        <th style={thStyle}>Последняя продажа</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productsList.map((prod, i) => {
+                        const recent = Date.now() - new Date(prod.lastSale).getTime() < 7 * 86400000
+                        return (
+                          <tr key={prod.slug || i}
+                            style={{ borderBottom: i < productsList.length - 1 ? '1px solid var(--crm-border)' : 'none', transition: 'background 0.12s' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--crm-surface-hover)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                            <td style={{ padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--crm-blue-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  {prod.is_plugin ? <Code size={14} color="var(--crm-blue)" strokeWidth={2}/> : <Package size={14} color="var(--crm-blue)" strokeWidth={2}/>}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)' }}>
+                                    {prod.name.length > 45 ? prod.name.slice(0, 45) + '…' : prod.name}
+                                  </div>
+                                  <div style={{ fontSize: 11, color: 'var(--crm-muted)', marginTop: 2 }}>{prod.slug}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 14px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: prod.is_plugin ? 'var(--crm-purple-dim)' : 'var(--crm-teal-dim)', color: prod.is_plugin ? 'var(--crm-purple)' : 'var(--crm-teal)' }}>
+                                {prod.is_plugin ? 'Плагин' : 'Сборка'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 14px' }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)' }}>{prod.count}</div>
+                              <div style={{ fontSize: 11, color: 'var(--crm-muted)' }}>раз</div>
+                            </td>
+                            <td style={{ padding: '12px 14px' }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-green)' }}>{formatMoney(prod.total)}</div>
+                              <div style={{ fontSize: 11, color: 'var(--crm-muted)' }}>средний {formatMoney(Math.round(prod.total / prod.count))}</div>
+                            </td>
+                            <td style={{ padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 12, color: 'var(--crm-muted)', whiteSpace: 'nowrap' }}>{formatDate(prod.lastSale)}</span>
+                                {recent && (
+                                  <span style={{ display: 'inline-flex', padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'var(--crm-green-dim)', color: 'var(--crm-green)', whiteSpace: 'nowrap' }}>
+                                    Недавно
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Charts column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                {/* Pie: revenue by type */}
+                <ChartBox title="Продажи по типу" minH={180}>
+                  {(() => {
+                    const pluginTotal = productsList.filter(p => p.is_plugin).reduce((s, p) => s + p.total, 0)
+                    const buildTotal  = productsList.filter(p => !p.is_plugin).reduce((s, p) => s + p.total, 0)
+                    const typeData = [
+                      { name: 'Плагины', value: pluginTotal, color: '#a855f7' },
+                      { name: 'Сборки',  value: buildTotal,  color: '#14b8a6' },
+                    ].filter(d => d.value > 0)
+                    return typeData.length === 0 ? <EmptyChart /> : (
+                      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        <div style={{ flex: 1 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={typeData} cx="50%" cy="50%" innerRadius="40%" outerRadius="70%" dataKey="value" paddingAngle={3}>
+                                {typeData.map((entry, i) => <Cell key={i} fill={entry.color}/>)}
+                              </Pie>
+                              <Tooltip content={({ active, payload }) =>
+                                active && payload?.length ? (
+                                  <div style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                                    <span style={{ color: (payload[0].payload as { color: string }).color, fontWeight: 600 }}>{payload[0].name}</span>
+                                    <div style={{ color: 'var(--crm-text)', marginTop: 2 }}>{formatMoney(payload[0].value as number)}</div>
+                                  </div>
+                                ) : null
+                              }/>
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: 14, fontSize: 11, paddingTop: 4 }}>
+                          {typeData.map(d => (
+                            <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color }}/>
+                              <span style={{ color: 'var(--crm-muted)' }}>{d.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </ChartBox>
+
+                {/* Bar: top 5 by revenue */}
+                <ChartBox title="Топ продуктов по доходу" minH={180}>
+                  {productsList.length === 0 ? <EmptyChart /> : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart layout="vertical" data={productsList.slice(0, 5).map(p => ({ name: p.name.length > 20 ? p.name.slice(0, 20) + '…' : p.name, value: p.total }))} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--crm-border)" horizontal={false}/>
+                        <XAxis type="number" tickFormatter={v => `${(v / 1000).toFixed(0)}к`} tick={{ fontSize: 10, fill: 'var(--crm-muted)' }} tickLine={false} axisLine={false}/>
+                        <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: 'var(--crm-muted)' }} tickLine={false} axisLine={false}/>
+                        <Tooltip content={<CustomTooltip />}/>
+                        <Bar dataKey="value" name="Доход" fill="#3b82f6" radius={[0, 4, 4, 0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartBox>
+              </div>
+            </div>
+
+            {/* KPI cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginTop: 12 }}>
+              <KpiCard
+                label="Всего продаж" value={String(fProducts.length)}
+                icon={ShoppingBag} iconColor="var(--crm-blue)" iconBg="var(--crm-blue-dim)"
+                sub="с сайта за период"
+              />
+              <KpiCard
+                label="Самый популярный"
+                value={(() => { const top = [...productsList].sort((a, b) => b.count - a.count)[0]; return top ? (top.name.length > 22 ? top.name.slice(0, 22) + '…' : top.name) : '—' })()}
+                icon={Trophy} iconColor="var(--crm-yellow)" iconBg="var(--crm-yellow-dim)"
+                sub={(() => { const top = [...productsList].sort((a, b) => b.count - a.count)[0]; return top ? `${top.count} продаж` : undefined })()}
+              />
+              <KpiCard
+                label="Средний чек сайта"
+                value={fProducts.length > 0 ? formatMoney(Math.round(fProducts.reduce((s, p) => s + Number(p.amount), 0) / fProducts.length)) : '—'}
+                icon={Calculator} iconColor="var(--crm-teal)" iconBg="var(--crm-teal-dim)"
+                sub="за одну покупку"
+              />
+            </div>
+          </>
+        )}
+      </div>
 
       {/* ── Interesting stats (6 cards) ── */}
       <div>

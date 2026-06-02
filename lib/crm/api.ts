@@ -422,6 +422,22 @@ export async function updateRequestStatus(
   if (error) throw error
 }
 
+// ─── PRODUCTS STATS ──────────────────────────────────────────────────────────
+
+export async function getProductsStats() {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('purchases')
+    .select(`
+      amount,
+      created_at,
+      product:products(id, name, price, slug, is_plugin)
+    `)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
 // ─── DASHBOARD STATS ─────────────────────────────────────────────────────────
 
 export async function getDashboardStats(): Promise<DashboardStats> {
