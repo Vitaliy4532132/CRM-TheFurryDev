@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Search, Eye, UserPlus, Inbox, BellRing, Clock, UserCheck, Plus, Pencil, Trash2 } from 'lucide-react'
 import { StatCard } from '@/components/crm/stat-card'
+import { SensitiveValue } from '@/components/crm/sensitive-value'
 import { ViewRequestModal }    from '@/components/crm/modals/view-request-modal'
 import { ConvertRequestModal } from '@/components/crm/modals/convert-request-modal'
 import { CreateRequestModal }  from '@/components/crm/modals/create-request-modal'
@@ -205,10 +206,10 @@ export default function RequestsPage() {
       <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12 }}>
         {loading ? [0,1,2,3].map(i=><StatSkel key={i}/>) : (
           <>
-            <StatCard label="Всего заявок"   value={total}      icon={Inbox}     iconColor="var(--crm-blue)"   iconBg="var(--crm-blue-dim)"   sub="за всё время"/>
-            <StatCard label="Новые"          value={newCount}   icon={BellRing}  iconColor="var(--crm-purple)" iconBg="var(--crm-purple-dim)" sub="ожидают обработки"/>
-            <StatCard label="В обработке"    value={inProgress} icon={Clock}     iconColor="var(--crm-yellow)" iconBg="var(--crm-yellow-dim)" sub="активных"/>
-            <StatCard label="Конвертированы" value={converted}  icon={UserCheck} iconColor="var(--crm-green)"  iconBg="var(--crm-green-dim)"  sub="стали клиентами"/>
+            <StatCard label="Всего заявок"   value={total}      icon={Inbox}     iconColor="var(--crm-blue)"   iconBg="var(--crm-blue-dim)"   sub="за всё время"       sensitive/>
+            <StatCard label="Новые"          value={newCount}   icon={BellRing}  iconColor="var(--crm-purple)" iconBg="var(--crm-purple-dim)" sub="ожидают обработки"  sensitive/>
+            <StatCard label="В обработке"    value={inProgress} icon={Clock}     iconColor="var(--crm-yellow)" iconBg="var(--crm-yellow-dim)" sub="активных"           sensitive/>
+            <StatCard label="Конвертированы" value={converted}  icon={UserCheck} iconColor="var(--crm-green)"  iconBg="var(--crm-green-dim)"  sub="стали клиентами"    sensitive/>
           </>
         )}
       </div>
@@ -319,7 +320,7 @@ export default function RequestsPage() {
                         {req.service ?? '—'}
                       </td>
                       <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-text)',whiteSpace:'nowrap' }}>
-                        {req.budget > 0 ? formatMoney(req.budget) : '—'}
+                        {req.budget > 0 ? <SensitiveValue>{formatMoney(req.budget)}</SensitiveValue> : '—'}
                       </td>
                       <td style={{ padding:'12px 14px' }}>
                         <Badge text={statusLabel} colorMap={STATUS_COLORS}/>

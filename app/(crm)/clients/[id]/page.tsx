@@ -16,6 +16,7 @@ import type { BalanceTx, SitePurchase, SiteProfile } from '@/lib/crm/api'
 import { ORDER_STATUS_LABELS } from '@/types/crm'
 import { getPreferredPayment, formatMoney } from '@/lib/crm/helpers'
 import { PaymentMethodBadge } from '@/components/crm/status-badge'
+import { SensitiveValue } from '@/components/crm/sensitive-value'
 import type { CRMClient, CRMOrder, CRMPayment } from '@/types/crm'
 
 // ── Status badge ─────────────────────────────────────────────────────────────
@@ -79,7 +80,7 @@ function ContactChip({ icon:Icon, text, color, href }: { icon:typeof Send; text:
 
 // ── Mini stat card ────────────────────────────────────────────────────────────
 
-function MiniStat({ label, value, icon:Icon, color }: { label:string; value:string; icon:typeof Wallet; color:string }) {
+function MiniStat({ label, value, icon:Icon, color, sensitive }: { label:string; value:string; icon:typeof Wallet; color:string; sensitive?: boolean }) {
   return (
     <div style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:10,padding:'14px 16px',display:'flex',alignItems:'center',gap:12 }}>
       <div style={{ width:32,height:32,borderRadius:8,background:`${color}1a`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
@@ -87,7 +88,9 @@ function MiniStat({ label, value, icon:Icon, color }: { label:string; value:stri
       </div>
       <div>
         <div style={{ fontSize:11,fontWeight:600,color:'var(--crm-muted)',marginBottom:3,letterSpacing:'0.03em',textTransform:'uppercase' }}>{label}</div>
-        <div style={{ fontSize:18,fontWeight:700,color:'var(--crm-text)',letterSpacing:'-0.01em' }}>{value}</div>
+        <div style={{ fontSize:18,fontWeight:700,color:'var(--crm-text)',letterSpacing:'-0.01em' }}>
+          {sensitive ? <span className="crm-sensitive">{value}</span> : value}
+        </div>
       </div>
     </div>
   )
@@ -374,7 +377,7 @@ export default function ClientCardPage() {
                 Общая сумма
               </div>
               <div style={{ fontSize:24,fontWeight:700,color:'var(--crm-green)',letterSpacing:'-0.02em' }}>
-                {money(totalOverall)}
+                <SensitiveValue>{money(totalOverall)}</SensitiveValue>
               </div>
               <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:4 }}>сайт + заказы CRM</div>
             </div>
@@ -390,7 +393,7 @@ export default function ClientCardPage() {
                   {s.icon && <s.icon size={12} strokeWidth={2} style={{ color:s.color, flexShrink:0 }}/>}
                   {s.label}
                 </div>
-                <div style={{ fontSize:24,fontWeight:700,color:s.color,letterSpacing:'-0.02em' }}>{s.value}</div>
+                <div style={{ fontSize:24,fontWeight:700,color:s.color,letterSpacing:'-0.02em' }}><SensitiveValue>{s.value}</SensitiveValue></div>
                 {s.label === 'Пополнено на сайте' && (
                   <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:4 }}>реальных поступлений</div>
                 )}
@@ -408,9 +411,9 @@ export default function ClientCardPage() {
                   Активность на сайте
                 </div>
                 <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12 }}>
-                  <MiniStat label="Пополнений баланса"  value={String(topupCount)}            icon={Wallet}       color="#22c55e"/>
-                  <MiniStat label="Потрачено с баланса" value={money(spendTotal)}              icon={ShoppingCart} color="#a855f7"/>
-                  <MiniStat label="Куплено продуктов"   value={String(sitePurchases.length)}   icon={Package}      color="#3b82f6"/>
+                  <MiniStat label="Пополнений баланса"  value={String(topupCount)}            icon={Wallet}       color="#22c55e" sensitive/>
+                  <MiniStat label="Потрачено с баланса" value={money(spendTotal)}              icon={ShoppingCart} color="#a855f7" sensitive/>
+                  <MiniStat label="Куплено продуктов"   value={String(sitePurchases.length)}   icon={Package}      color="#3b82f6" sensitive/>
                 </div>
               </div>
 
@@ -428,7 +431,7 @@ export default function ClientCardPage() {
                         fontSize:28,fontWeight:700,letterSpacing:'-0.02em',
                         color: siteProfile.balance > 0 ? 'var(--crm-green)' : 'var(--crm-muted)',
                       }}>
-                        {money(siteProfile.balance)}
+                        <SensitiveValue>{money(siteProfile.balance)}</SensitiveValue>
                       </div>
                       <div style={{ fontSize:12,color:'var(--crm-muted)',marginTop:6 }}>
                         @{siteProfile.nickname}
@@ -462,7 +465,7 @@ export default function ClientCardPage() {
                             <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:2 }}>{formatDate(tx.created_at)}</div>
                           </div>
                           <div style={{ fontSize:13,fontWeight:700,color:'var(--crm-green)',whiteSpace:'nowrap',flexShrink:0 }}>
-                            +{money(tx.amount)}
+                            <SensitiveValue>+{money(tx.amount)}</SensitiveValue>
                           </div>
                         </div>
                       ))}
@@ -508,7 +511,7 @@ export default function ClientCardPage() {
                               {(p.product?.name ?? 'Неизвестный продукт').slice(0, 40)}
                             </td>
                             <td style={{ padding:'11px 14px',fontSize:13,fontWeight:700,color:'var(--crm-purple)',whiteSpace:'nowrap' }}>
-                              {money(p.amount)}
+                              <SensitiveValue>{money(p.amount)}</SensitiveValue>
                             </td>
                             <td style={{ padding:'11px 14px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
                               {formatDate(p.created_at)}
@@ -566,7 +569,7 @@ export default function ClientCardPage() {
                         </td>
                         <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-blue)',whiteSpace:'nowrap' }}>{order.service?.name ?? '—'}</td>
                         <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-text)',whiteSpace:'nowrap' }}>{order.project_name}</td>
-                        <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-text)',whiteSpace:'nowrap' }}>{money(order.amount)}</td>
+                        <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-text)',whiteSpace:'nowrap' }}><SensitiveValue>{money(order.amount)}</SensitiveValue></td>
                         <td style={{ padding:'12px 14px' }}><StatusChip status={order.status}/></td>
                         <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>{formatDate(order.created_at)}</td>
                       </tr>

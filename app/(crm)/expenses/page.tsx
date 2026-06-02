@@ -6,6 +6,7 @@ import {
   Search, Plus, Pencil, Trash2,
 } from 'lucide-react'
 import { StatCard } from '@/components/crm/stat-card'
+import { SensitiveValue } from '@/components/crm/sensitive-value'
 import { CreateExpenseModal } from '@/components/crm/modals/create-expense-modal'
 import { EditExpenseModal } from '@/components/crm/modals/edit-expense-modal'
 import { getExpenses, deleteCRMExpense } from '@/lib/crm/api'
@@ -163,10 +164,10 @@ export default function ExpensesPage() {
       <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12 }}>
         {loading ? [0,1,2,3].map(i=><StatSkel key={i}/>) : (
           <>
-            <StatCard label="Расходы за месяц"       value={formatMoney(monthTotal)} icon={TrendingDown} iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    sub="текущий месяц"/>
-            <StatCard label="Расходы за всё время"   value={formatMoney(allTotal)}   icon={Receipt}      iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    sub="за всё время"/>
+            <StatCard label="Расходы за месяц"       value={formatMoney(monthTotal)} icon={TrendingDown} iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    sub="текущий месяц"    sensitive/>
+            <StatCard label="Расходы за всё время"   value={formatMoney(allTotal)}   icon={Receipt}      iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    sub="за всё время"     sensitive/>
             <StatCard label="Самая крупная категория" value={topCategoryLabel}        icon={Users}        iconColor="var(--crm-orange)" iconBg="var(--crm-orange-dim)" sub="по сумме расходов"/>
-            <StatCard label="Транзакций за месяц"    value={monthCount}              icon={List}         iconColor="var(--crm-blue)"   iconBg="var(--crm-blue-dim)"   sub="операций"/>
+            <StatCard label="Транзакций за месяц"    value={monthCount}              icon={List}         iconColor="var(--crm-blue)"   iconBg="var(--crm-blue-dim)"   sub="операций"                 sensitive/>
           </>
         )}
       </div>
@@ -257,7 +258,7 @@ export default function ExpensesPage() {
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:500,color:'var(--crm-text)',whiteSpace:'nowrap' }}>{exp.name}</td>
                     <td style={{ padding:'12px 14px' }}><CategoryBadge category={exp.category}/></td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-red)',whiteSpace:'nowrap' }}>
-                      −{formatMoney(exp.amount)}
+                      <SensitiveValue>−{formatMoney(exp.amount)}</SensitiveValue>
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
                       {formatDate(exp.date)}

@@ -7,6 +7,7 @@ import {
   Wallet, Receipt, PiggyBank, AlertTriangle, Plus, CreditCard,
 } from 'lucide-react'
 import { StatCard } from '@/components/crm/stat-card'
+import { SensitiveValue } from '@/components/crm/sensitive-value'
 import { CreatePaymentModal } from '@/components/crm/modals/create-payment-modal'
 import { getPayments, getExpenses, getOrders } from '@/lib/crm/api'
 import { formatMoney, formatDate, PAYMENT_METHOD_LABELS } from '@/lib/crm/helpers'
@@ -129,9 +130,9 @@ export default function FinancePage() {
       <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12 }}>
         {loading ? [0,1,2].map(i=><StatSkel key={i}/>) : (
           <>
-            <StatCard label="Доход за месяц"   value={formatMoney(monthIncome)}  icon={TrendingUp}  iconColor="var(--crm-green)"  iconBg="var(--crm-green-dim)"  valueColor="var(--crm-green)"  delta={incomeDelta?.label}  deltaPositive={incomeDelta?.positive}/>
-            <StatCard label="Расходы за месяц" value={formatMoney(monthExpense)} icon={TrendingDown} iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    delta={expenseDelta?.label} deltaPositive={expenseDelta?.positive === false ? false : undefined}/>
-            <StatCard label="Прибыль за месяц" value={formatMoney(monthProfit)}  icon={BarChart2}   iconColor="var(--crm-teal)"   iconBg="var(--crm-teal-dim)"   valueColor="var(--crm-teal)"/>
+            <StatCard label="Доход за месяц"   value={formatMoney(monthIncome)}  icon={TrendingUp}  iconColor="var(--crm-green)"  iconBg="var(--crm-green-dim)"  valueColor="var(--crm-green)"  delta={incomeDelta?.label}  deltaPositive={incomeDelta?.positive}  sensitive/>
+            <StatCard label="Расходы за месяц" value={formatMoney(monthExpense)} icon={TrendingDown} iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    delta={expenseDelta?.label} deltaPositive={expenseDelta?.positive === false ? false : undefined} sensitive/>
+            <StatCard label="Прибыль за месяц" value={formatMoney(monthProfit)}  icon={BarChart2}   iconColor="var(--crm-teal)"   iconBg="var(--crm-teal-dim)"   valueColor="var(--crm-teal)"  sensitive/>
           </>
         )}
       </div>
@@ -140,9 +141,9 @@ export default function FinancePage() {
       <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12 }}>
         {loading ? [0,1,2].map(i=><StatSkel key={i}/>) : (
           <>
-            <StatCard label="Доход за всё время"   value={formatMoney(totalIncome)}  icon={Wallet}    iconColor="var(--crm-green)"  iconBg="var(--crm-green-dim)"  valueColor="var(--crm-green)"  sub="с начала работы"/>
-            <StatCard label="Расходы за всё время" value={formatMoney(totalExpense)} icon={Receipt}   iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    sub="за всё время"/>
-            <StatCard label="Прибыль за всё время" value={formatMoney(totalProfit)}  icon={PiggyBank} iconColor="var(--crm-teal)"   iconBg="var(--crm-teal-dim)"   valueColor="var(--crm-teal)"   sub="чистая прибыль"/>
+            <StatCard label="Доход за всё время"   value={formatMoney(totalIncome)}  icon={Wallet}    iconColor="var(--crm-green)"  iconBg="var(--crm-green-dim)"  valueColor="var(--crm-green)"  sub="с начала работы"  sensitive/>
+            <StatCard label="Расходы за всё время" value={formatMoney(totalExpense)} icon={Receipt}   iconColor="var(--crm-red)"    iconBg="var(--crm-red-dim)"    valueColor="var(--crm-red)"    sub="за всё время"     sensitive/>
+            <StatCard label="Прибыль за всё время" value={formatMoney(totalProfit)}  icon={PiggyBank} iconColor="var(--crm-teal)"   iconBg="var(--crm-teal-dim)"   valueColor="var(--crm-teal)"   sub="чистая прибыль"   sensitive/>
           </>
         )}
       </div>
@@ -157,7 +158,7 @@ export default function FinancePage() {
           <div style={{ fontSize:11,color:'var(--crm-muted)',opacity:0.7 }}>Сумма всех неоплаченных и частично оплаченных заказов</div>
         </div>
         <div style={{ fontSize:28,fontWeight:700,color:'var(--crm-yellow)',letterSpacing:'-0.02em',flexShrink:0 }}>
-          {loading ? '—' : formatMoney(totalDebt)}
+          {loading ? '—' : <SensitiveValue>{formatMoney(totalDebt)}</SensitiveValue>}
         </div>
       </div>
 
@@ -216,7 +217,7 @@ export default function FinancePage() {
                       {p.client?.name ?? '—'}
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-green)',whiteSpace:'nowrap' }}>
-                      +{formatMoney(p.amount)}
+                      <SensitiveValue>+{formatMoney(p.amount)}</SensitiveValue>
                     </td>
                     <td style={{ padding:'12px 14px' }}>
                       <MethodBadge method={p.payment_method}/>

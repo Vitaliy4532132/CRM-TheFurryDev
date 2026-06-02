@@ -165,12 +165,13 @@ function ChartSkel({ h = 300 }: { h?: number }) {
 
 function KpiCard({
   label, value, icon: Icon, iconColor, iconBg,
-  change, sub,
+  change, sub, sensitive,
 }: {
   label: string; value: string
   icon: typeof TrendingUp; iconColor: string; iconBg: string
   change?: { pct: number; up: boolean } | null
   sub?: string
+  sensitive?: boolean
 }) {
   return (
     <div style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 12, padding: '18px 20px' }}>
@@ -181,11 +182,11 @@ function KpiCard({
         </div>
       </div>
       <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--crm-text)', letterSpacing: '-0.02em', marginBottom: 6 }}>
-        {value}
+        {sensitive ? <span className="crm-sensitive">{value}</span> : value}
       </div>
       <div style={{ fontSize: 11, color: 'var(--crm-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
         {change != null && (
-          <span style={{ fontWeight: 600, color: change.up ? 'var(--crm-green)' : 'var(--crm-red)' }}>
+          <span className={sensitive ? 'crm-sensitive' : undefined} style={{ fontWeight: 600, color: change.up ? 'var(--crm-green)' : 'var(--crm-red)' }}>
             {change.up ? '↑' : '↓'} {Math.abs(change.pct)}%
           </span>
         )}
@@ -220,7 +221,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
       {label && <div style={{ color: 'var(--crm-muted)', marginBottom: 6, fontWeight: 600 }}>{label}</div>}
       {payload.map(p => (
         <div key={p.name} style={{ color: p.color, marginBottom: 2 }}>
-          {p.name}: <strong>{formatMoney(p.value)}</strong>
+          {p.name}: <strong className="crm-sensitive">{formatMoney(p.value)}</strong>
         </div>
       ))}
     </div>
@@ -228,9 +229,9 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 }
 
 const StatCard = ({
-  icon: Icon, title, value, sub, accent = false,
+  icon: Icon, title, value, sub, accent = false, sensitive = false,
 }: {
-  icon: typeof Trophy; title: string; value: string; sub?: string; accent?: boolean
+  icon: typeof Trophy; title: string; value: string; sub?: string; accent?: boolean; sensitive?: boolean
 }) => (
   <div style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 12, padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
     <div style={{ width: 36, height: 36, borderRadius: 9, background: accent ? 'var(--crm-yellow-dim)' : 'var(--crm-s3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -238,7 +239,9 @@ const StatCard = ({
     </div>
     <div>
       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-muted)', marginBottom: 4, letterSpacing: '0.03em', textTransform: 'uppercase' }}>{title}</div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text)', lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text)', lineHeight: 1.2 }}>
+        {sensitive ? <span className="crm-sensitive">{value}</span> : value}
+      </div>
       {sub && <div style={{ fontSize: 11, color: 'var(--crm-muted)', marginTop: 3 }}>{sub}</div>}
     </div>
   </div>
@@ -414,25 +417,25 @@ export default function AnalyticsPage() {
               label="Доход" value={formatMoney(totalIncome)}
               icon={TrendingUp} iconColor="var(--crm-green)" iconBg="var(--crm-green-dim)"
               change={period !== 'all' ? calcChange(totalIncome, prevIncome) : null}
-              sub="за период"
+              sub="за период" sensitive
             />
             <KpiCard
               label="Расходы" value={formatMoney(totalExpense)}
               icon={TrendingDown} iconColor="var(--crm-red)" iconBg="var(--crm-red-dim)"
               change={period !== 'all' ? calcChange(totalExpense, prevExpense) : null}
-              sub="за период"
+              sub="за период" sensitive
             />
             <KpiCard
               label="Прибыль" value={formatMoney(totalProfit)}
               icon={BarChart2} iconColor="var(--crm-teal)" iconBg="var(--crm-teal-dim)"
               change={null}
-              sub={`маржа ${margin}%`}
+              sub={`маржа ${margin}%`} sensitive
             />
             <KpiCard
               label="Новых клиентов" value={String(fc.length)}
               icon={UserPlus} iconColor="var(--crm-purple)" iconBg="var(--crm-purple-dim)"
               change={null}
-              sub="за период"
+              sub="за период" sensitive
             />
           </>
         )}
@@ -618,12 +621,12 @@ export default function AnalyticsPage() {
                               </span>
                             </td>
                             <td style={{ padding: '12px 14px' }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)' }}>{prod.count}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)' }}><span className="crm-sensitive">{prod.count}</span></div>
                               <div style={{ fontSize: 11, color: 'var(--crm-muted)' }}>раз</div>
                             </td>
                             <td style={{ padding: '12px 14px' }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-green)' }}>{formatMoney(prod.total)}</div>
-                              <div style={{ fontSize: 11, color: 'var(--crm-muted)' }}>средний {formatMoney(Math.round(prod.total / prod.count))}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-green)' }}><span className="crm-sensitive">{formatMoney(prod.total)}</span></div>
+                              <div style={{ fontSize: 11, color: 'var(--crm-muted)' }}>средний <span className="crm-sensitive">{formatMoney(Math.round(prod.total / prod.count))}</span></div>
                             </td>
                             <td style={{ padding: '12px 14px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -709,7 +712,7 @@ export default function AnalyticsPage() {
               <KpiCard
                 label="Всего продаж" value={String(fProducts.length)}
                 icon={ShoppingBag} iconColor="var(--crm-blue)" iconBg="var(--crm-blue-dim)"
-                sub="с сайта за период"
+                sub="с сайта за период" sensitive
               />
               <KpiCard
                 label="Самый популярный"
@@ -721,7 +724,7 @@ export default function AnalyticsPage() {
                 label="Средний чек сайта"
                 value={fProducts.length > 0 ? formatMoney(Math.round(fProducts.reduce((s, p) => s + Number(p.amount), 0) / fProducts.length)) : '—'}
                 icon={Calculator} iconColor="var(--crm-teal)" iconBg="var(--crm-teal-dim)"
-                sub="за одну покупку"
+                sub="за одну покупку" sensitive
               />
             </div>
           </>
@@ -741,11 +744,13 @@ export default function AnalyticsPage() {
               icon={Trophy} title="Лучший день"
               value={bestDay ? formatMoney(bestDay.amount) : '—'}
               sub={bestDay ? bestDay.date : 'Нет данных'}
+              sensitive
             />
             <StatCard
               icon={Calculator} title="Средний чек"
               value={avgPayment > 0 ? formatMoney(avgPayment) : '—'}
               sub={`${fp.length} платежей за период`}
+              sensitive
             />
             <StatCard
               icon={Star} title="Самый активный клиент"
@@ -766,7 +771,7 @@ export default function AnalyticsPage() {
               icon={AlertTriangle} title="Незакрытый долг"
               value={formatMoney(totalDebt)}
               sub={`${debtorCount} должников`}
-              accent
+              accent sensitive
             />
           </div>
         )}

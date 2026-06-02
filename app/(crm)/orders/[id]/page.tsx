@@ -17,6 +17,7 @@ import {
   PAYMENT_METHOD_LABELS, formatMoney, formatDate, getDeadlineColor,
 } from '@/lib/crm/helpers'
 import type { CRMOrder, CRMPayment, CRMClient, CRMService } from '@/types/crm'
+import { SensitiveValue } from '@/components/crm/sensitive-value'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -301,22 +302,22 @@ export default function OrderCardPage() {
             <div style={{ display:'flex',flexDirection:'column',gap:10,marginBottom:16 }}>
               <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center' }}>
                 <span style={{ fontSize:13,color:'var(--crm-muted)' }}>Сумма заказа</span>
-                <span style={{ fontSize:13,fontWeight:700,color:'var(--crm-text)' }}>{formatMoney(order.amount)}</span>
+                <SensitiveValue><span style={{ fontSize:13,fontWeight:700,color:'var(--crm-text)' }}>{formatMoney(order.amount)}</span></SensitiveValue>
               </div>
               <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center' }}>
                 <span style={{ fontSize:13,color:'var(--crm-muted)' }}>Оплачено</span>
-                <span style={{ fontSize:13,fontWeight:700,color: pct>=100?'var(--crm-green)':pct>0?'var(--crm-orange)':'var(--crm-red)' }}>{formatMoney(order.paid)}</span>
+                <SensitiveValue><span style={{ fontSize:13,fontWeight:700,color: pct>=100?'var(--crm-green)':pct>0?'var(--crm-orange)':'var(--crm-red)' }}>{formatMoney(order.paid)}</span></SensitiveValue>
               </div>
               <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center' }}>
                 <span style={{ fontSize:13,color:'var(--crm-muted)' }}>Остаток</span>
-                <span style={{ fontSize:13,fontWeight:700,color:rest===0?'var(--crm-muted)':'var(--crm-red)' }}>{rest===0?'—':formatMoney(rest)}</span>
+                <SensitiveValue><span style={{ fontSize:13,fontWeight:700,color:rest===0?'var(--crm-muted)':'var(--crm-red)' }}>{rest===0?'—':formatMoney(rest)}</span></SensitiveValue>
               </div>
             </div>
             <div style={{ height:1,background:'var(--crm-border)',marginBottom:14 }}/>
             <div style={{ display:'flex',flexDirection:'column',gap:5 }}>
               <div style={{ display:'flex',justifyContent:'space-between' }}>
                 <span style={{ fontSize:11,color:'var(--crm-muted)' }}>Прогресс оплаты</span>
-                <span style={{ fontSize:11,fontWeight:600,color:barColor }}>{pct}%</span>
+                <SensitiveValue><span style={{ fontSize:11,fontWeight:600,color:barColor }}>{pct}%</span></SensitiveValue>
               </div>
               <div style={{ width:'100%',height:6,borderRadius:4,background:'var(--crm-s3)',overflow:'hidden' }}>
                 <div style={{ height:'100%',width:`${pct}%`,borderRadius:4,background:barColor,transition:'width 0.4s ease' }}/>
@@ -344,7 +345,7 @@ export default function OrderCardPage() {
               {payments.map((p, i) => (
                 <tr key={p.id} style={{ borderBottom: i < payments.length-1 ? '1px solid var(--crm-border)' : 'none' }}>
                   <td style={{ padding:'11px 12px',fontSize:13,color:'var(--crm-muted)',fontWeight:600 }}>{i+1}</td>
-                  <td style={{ padding:'11px 12px',fontSize:13,fontWeight:700,color:'var(--crm-green)',whiteSpace:'nowrap' }}>+{formatMoney(p.amount)}</td>
+                  <td style={{ padding:'11px 12px',fontSize:13,fontWeight:700,color:'var(--crm-green)',whiteSpace:'nowrap' }}><SensitiveValue>+{formatMoney(p.amount)}</SensitiveValue></td>
                   <td style={{ padding:'11px 12px' }}><MethodBadge method={p.payment_method}/></td>
                   <td style={{ padding:'11px 12px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>{formatDate(p.payment_date)}</td>
                   <td style={{ padding:'11px 12px',fontSize:13,color:'var(--crm-muted)' }}>{p.comment ?? '—'}</td>

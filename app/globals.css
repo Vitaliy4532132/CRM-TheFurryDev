@@ -80,6 +80,7 @@
   filter: blur(0px);
   transition: filter 0.3s ease;
   display: inline-block;
+  border-radius: 4px;
 }
 
 [data-privacy="true"] .crm-sensitive {

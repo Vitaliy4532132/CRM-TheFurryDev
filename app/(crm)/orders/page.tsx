@@ -11,6 +11,7 @@ import {
   ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
   formatMoney, formatDate, getDeadlineColor, getPaymentStatus,
 } from '@/lib/crm/helpers'
+import { SensitiveValue } from '@/components/crm/sensitive-value'
 import type { CRMOrder, CRMClient, CRMService } from '@/types/crm'
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -261,13 +262,13 @@ export default function OrdersPage() {
                       {order.project_name}
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-text)',whiteSpace:'nowrap' }}>
-                      {formatMoney(order.amount)}
+                      <SensitiveValue>{formatMoney(order.amount)}</SensitiveValue>
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:paidColor,whiteSpace:'nowrap' }}>
-                      {pay.label}
+                      <SensitiveValue>{pay.label}</SensitiveValue>
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:rest===0?'var(--crm-muted)':'var(--crm-red)',whiteSpace:'nowrap' }}>
-                      {rest === 0 ? '—' : formatMoney(rest)}
+                      {rest === 0 ? '—' : <SensitiveValue>{formatMoney(rest)}</SensitiveValue>}
                     </td>
                     <td style={{ padding:'12px 14px' }}>
                       <OrderStatusBadge status={order.status}/>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { UserPlus, Search, Send, Eye, Pencil, Trash2, Users, ShoppingCart, Globe } from 'lucide-react'
 import Link from 'next/link'
 import { getClients, deleteCRMClient } from '@/lib/crm/api'
+import { SensitiveValue } from '@/components/crm/sensitive-value'
 import { CreateClientModal } from '@/components/crm/modals/create-client-modal'
 import { EditClientModal } from '@/components/crm/modals/edit-client-modal'
 import type { CRMClient } from '@/types/crm'
@@ -364,13 +365,13 @@ export default function ClientsPage() {
                     {client.country ?? '—'}
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', textAlign: 'center' }}>
-                    {client.orders?.length ?? 0}
+                    <SensitiveValue>{String(client.orders?.length ?? 0)}</SensitiveValue>
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
                     {client.total_spent > 0 ? (
                       <span style={{ display:'inline-flex',alignItems:'center',gap:5,color:'var(--crm-purple)' }}>
                         <ShoppingCart size={12} strokeWidth={2}/>
-                        {client.total_spent.toLocaleString('ru-RU')} ₽
+                        <SensitiveValue>{client.total_spent.toLocaleString('ru-RU')} ₽</SensitiveValue>
                       </span>
                     ) : (
                       <span style={{ color:'var(--crm-muted)' }}>—</span>
