@@ -213,8 +213,11 @@ export default function FinancePage() {
                         </Link>
                       ) : '—'}
                     </td>
-                    <td style={{ padding:'12px 14px',fontSize:13,fontWeight:500,color:'var(--crm-text)',whiteSpace:'nowrap' }}>
-                      {p.client?.name ?? '—'}
+                    <td style={{ padding:'12px 14px',fontSize:13,fontWeight:500,whiteSpace:'nowrap' }}>
+                      {p.client?.name
+                        ? <span style={{ color:'var(--crm-text)' }}>{p.client.name}</span>
+                        : <span style={{ color:'var(--crm-muted)' }}>Без клиента</span>
+                      }
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-green)',whiteSpace:'nowrap' }}>
                       <SensitiveValue>+{formatMoney(p.amount)}</SensitiveValue>
@@ -249,7 +252,6 @@ export default function FinancePage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSuccess={() => loadAll()}
-        orders={orders}
       />
     </div>
   )
