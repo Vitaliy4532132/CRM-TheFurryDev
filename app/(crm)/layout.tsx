@@ -2,6 +2,7 @@ import { Sidebar } from '@/components/crm/sidebar'
 import { Topbar } from '@/components/crm/topbar'
 import { GlobalModals } from '@/components/crm/global-modals'
 import { PrivacyProvider } from '@/components/crm/privacy-provider'
+import { CRMClientProviders } from '@/components/crm/crm-client-providers'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -13,6 +14,7 @@ export default async function CRMLayout({ children }: { children: React.ReactNod
 
   return (
     <PrivacyProvider>
+      <CRMClientProviders />
       <div
         style={{
           display: 'flex',

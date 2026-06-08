@@ -1,6 +1,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { getCached, setCached, invalidateCache } from './cache'
 import type {
   CRMClient, CRMOrder, CRMPayment,
   CRMExpense, CRMService,
@@ -10,13 +11,18 @@ import type {
 // ─── CLIENTS ─────────────────────────────────────────────────────────────────
 
 export async function getClients(): Promise<CRMClient[]> {
+  const cached = getCached<CRMClient[]>('clients')
+  if (cached) return cached
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from('crm_clients')
     .select('*')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data ?? []
+  const result = data ?? []
+  setCached('clients', result)
+  return result
 }
 
 export async function getClientById(id: string): Promise<CRMClient> {
@@ -40,6 +46,7 @@ export async function createCRMClient(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('clients', 'dashboard')
   return data
 }
 
@@ -55,6 +62,7 @@ export async function updateCRMClient(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('clients')
   return data
 }
 
@@ -65,18 +73,24 @@ export async function deleteCRMClient(id: string): Promise<void> {
     .delete()
     .eq('id', id)
   if (error) throw error
+  invalidateCache('clients', 'dashboard')
 }
 
 // ─── SERVICES ────────────────────────────────────────────────────────────────
 
 export async function getServices(): Promise<CRMService[]> {
+  const cached = getCached<CRMService[]>('services')
+  if (cached) return cached
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from('crm_services')
     .select('*')
     .order('name', { ascending: true })
   if (error) throw error
-  return data ?? []
+  const result = data ?? []
+  setCached('services', result)
+  return result
 }
 
 export async function createCRMService(
@@ -89,6 +103,7 @@ export async function createCRMService(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('services')
   return data
 }
 
@@ -104,6 +119,7 @@ export async function updateCRMService(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('services')
   return data
 }
 
@@ -114,11 +130,15 @@ export async function deleteCRMService(id: string): Promise<void> {
     .delete()
     .eq('id', id)
   if (error) throw error
+  invalidateCache('services')
 }
 
 // ─── ORDERS ──────────────────────────────────────────────────────────────────
 
 export async function getOrders(): Promise<CRMOrder[]> {
+  const cached = getCached<CRMOrder[]>('orders')
+  if (cached) return cached
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from('crm_orders')
@@ -129,7 +149,9 @@ export async function getOrders(): Promise<CRMOrder[]> {
     `)
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data ?? []
+  const result = data ?? []
+  setCached('orders', result)
+  return result
 }
 
 export async function getOrderById(id: string): Promise<CRMOrder> {
@@ -169,6 +191,7 @@ export async function createCRMOrder(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('orders', 'dashboard')
   return data
 }
 
@@ -184,6 +207,7 @@ export async function updateCRMOrder(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('orders', 'dashboard')
   return data
 }
 
@@ -194,11 +218,15 @@ export async function deleteCRMOrder(id: string): Promise<void> {
     .delete()
     .eq('id', id)
   if (error) throw error
+  invalidateCache('orders', 'dashboard')
 }
 
 // ─── PAYMENTS ────────────────────────────────────────────────────────────────
 
 export async function getPayments(): Promise<CRMPayment[]> {
+  const cached = getCached<CRMPayment[]>('payments')
+  if (cached) return cached
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from('crm_payments')
@@ -209,7 +237,9 @@ export async function getPayments(): Promise<CRMPayment[]> {
     `)
     .order('payment_date', { ascending: false })
   if (error) throw error
-  return data ?? []
+  const result = data ?? []
+  setCached('payments', result)
+  return result
 }
 
 // ─── SITE DATA (balance_transactions, purchases, profiles) ───────────────────
@@ -300,6 +330,7 @@ export async function createCRMPayment(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('payments', 'orders', 'dashboard')
   return data
 }
 
@@ -310,18 +341,24 @@ export async function deleteCRMPayment(id: string): Promise<void> {
     .delete()
     .eq('id', id)
   if (error) throw error
+  invalidateCache('payments', 'orders', 'dashboard')
 }
 
 // ─── EXPENSES ────────────────────────────────────────────────────────────────
 
 export async function getExpenses(): Promise<CRMExpense[]> {
+  const cached = getCached<CRMExpense[]>('expenses')
+  if (cached) return cached
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from('crm_expenses')
     .select('*')
     .order('date', { ascending: false })
   if (error) throw error
-  return data ?? []
+  const result = data ?? []
+  setCached('expenses', result)
+  return result
 }
 
 export async function createCRMExpense(
@@ -334,6 +371,7 @@ export async function createCRMExpense(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('expenses', 'dashboard')
   return data
 }
 
@@ -349,6 +387,7 @@ export async function updateCRMExpense(
     .select()
     .single()
   if (error) throw error
+  invalidateCache('expenses', 'dashboard')
   return data
 }
 
@@ -359,6 +398,7 @@ export async function deleteCRMExpense(id: string): Promise<void> {
     .delete()
     .eq('id', id)
   if (error) throw error
+  invalidateCache('expenses', 'dashboard')
 }
 
 // ─── PRODUCTS STATS ──────────────────────────────────────────────────────────
@@ -514,12 +554,17 @@ export type HiddenTransaction = {
 }
 
 export async function getHiddenTransactions(): Promise<HiddenTransaction[]> {
+  const cached = getCached<HiddenTransaction[]>('hidden')
+  if (cached) return cached
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from('crm_hidden_transactions')
     .select('source_type, source_id')
   if (error) throw error
-  return (data ?? []) as HiddenTransaction[]
+  const result = (data ?? []) as HiddenTransaction[]
+  setCached('hidden', result)
+  return result
 }
 
 export async function hideTransaction(
@@ -531,6 +576,7 @@ export async function hideTransaction(
     .from('crm_hidden_transactions')
     .insert({ source_type: sourceType, source_id: sourceId })
   if (error) throw error
+  invalidateCache('hidden')
 }
 
 export async function unhideTransaction(
@@ -544,6 +590,7 @@ export async function unhideTransaction(
     .eq('source_type', sourceType)
     .eq('source_id', sourceId)
   if (error) throw error
+  invalidateCache('hidden')
 }
 
 // ─── CLIENT HISTORY ───────────────────────────────────────────────────────────

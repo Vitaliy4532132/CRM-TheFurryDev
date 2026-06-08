@@ -74,6 +74,13 @@
   }
 }
 
+/* ── Navigation progress bar ────────────────────────────────────────────── */
+
+@keyframes crm-progress {
+  from { width: 0%;   opacity: 1; }
+  to   { width: 100%; opacity: 0; }
+}
+
 /* ── Privacy mode — blur all sensitive numbers ──────────────────────────── */
 
 .crm-sensitive {

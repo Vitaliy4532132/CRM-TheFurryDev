@@ -8,7 +8,7 @@ import {
   Send, MessageSquare, Mail, ExternalLink,
   RefreshCw, Plus, CheckCircle, CreditCard,
 } from 'lucide-react'
-import { getOrderById, getPaymentsByOrder, getClients, getServices, updateCRMOrder, deleteCRMOrder } from '@/lib/crm/api'
+import { getOrders, getPayments, getClients, getServices, updateCRMOrder, deleteCRMOrder } from '@/lib/crm/api'
 import { CreatePaymentModal } from '@/components/crm/modals/create-payment-modal'
 import { ChangeStatusModal } from '@/components/crm/modals/change-status-modal'
 import { EditOrderModal } from '@/components/crm/modals/edit-order-modal'
@@ -120,12 +120,15 @@ export default function OrderCardPage() {
 
   const loadOrder = useCallback(async () => {
     try {
-      const [o, p, c, s] = await Promise.all([
-        getOrderById(id),
-        getPaymentsByOrder(id),
+      const [allOrders, allPayments, c, s] = await Promise.all([
+        getOrders(),
+        getPayments(),
         getClients(),
         getServices(),
       ])
+      const o = allOrders.find(ord => ord.id === id)
+      if (!o) { setNotFound(true); return }
+      const p = allPayments.filter(pmt => pmt.order_id === id)
       setOrder(o); setPayments(p); setClients(c); setServices(s)
     } catch { setNotFound(true) }
     finally { setLoading(false) }
@@ -151,12 +154,14 @@ export default function OrderCardPage() {
 
   async function handlePaymentCreated(_amount: number) {
     if (!order) return
-    // Trigger recalculate_order_paid handles paid update — just reload fresh data
-    const [updatedOrder, updatedPayments] = await Promise.all([
-      getOrderById(id),
-      getPaymentsByOrder(id),
+    // createCRMPayment инвалидировал кеш — загружаем свежие данные
+    const [allOrders, allPayments] = await Promise.all([
+      getOrders(),
+      getPayments(),
     ])
-    setOrder(updatedOrder)
+    const updatedOrder    = allOrders.find(o => o.id === id)
+    const updatedPayments = allPayments.filter(p => p.order_id === id)
+    if (updatedOrder) setOrder(updatedOrder)
     setPayments(updatedPayments)
   }
 

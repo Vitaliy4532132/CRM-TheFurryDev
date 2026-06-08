@@ -10,7 +10,7 @@ import {
   CreditCard, CheckCircle, ShoppingBag, ArrowUpCircle, Clock,
 } from 'lucide-react'
 import {
-  getClientById, getOrdersByClient, getPaymentsByClient, updateCRMClient,
+  getClients, getOrders, getPayments, updateCRMClient,
   getClientTransactions, getClientPurchases, getSiteProfile,
 } from '@/lib/crm/api'
 import type { BalanceTx, SitePurchase, SiteProfile } from '@/lib/crm/api'
@@ -269,11 +269,15 @@ export default function ClientCardPage() {
     async function load() {
       setLoading(true)
       try {
-        const [c, o, p] = await Promise.all([
-          getClientById(id),
-          getOrdersByClient(id),
-          getPaymentsByClient(id),
+        const [allClients, allOrders, allPayments] = await Promise.all([
+          getClients(),
+          getOrders(),
+          getPayments(),
         ])
+        const c = allClients.find(cl => cl.id === id)
+        if (!c) { setNotFound(true); return }
+        const o = allOrders.filter(ord => ord.client_id === id)
+        const p = allPayments.filter(pmt => pmt.client_id === id)
         setClient(c); setOrders(o); setPayments(p)
 
         // Load site data if linked to a profile
@@ -300,12 +304,13 @@ export default function ClientCardPage() {
 
   const refreshOrdersAndPayments = useCallback(async () => {
     if (!client) return
-    const [updatedOrders, updatedPayments] = await Promise.all([
-      getOrdersByClient(id),
-      getPaymentsByClient(id),
+    // Кеш инвалидирован после мутации — получаем свежие данные
+    const [allOrders, allPayments] = await Promise.all([
+      getOrders(),
+      getPayments(),
     ])
-    setOrders(updatedOrders)
-    setPayments(updatedPayments)
+    setOrders(allOrders.filter(ord => ord.client_id === id))
+    setPayments(allPayments.filter(pmt => pmt.client_id === id))
   }, [id, client])
 
   // ── Stats ──────────────────────────────────────────────────────────────────
