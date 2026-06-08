@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, Pencil, Trash2 } from 'lucide-react'
 import { StatusBadge } from '@/components/crm/status-badge'
@@ -36,7 +37,7 @@ function ActionButton({
   return (
     <button
       title={title}
-      onClick={onClick}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
       style={{
         width: 28,
         height: 28,
@@ -71,6 +72,7 @@ function ActionButton({
 
 export function OrdersTable({ orders }: OrdersTableProps) {
   const [editOpen, setEditOpen] = useState(false)
+  const router = useRouter()
 
   const thStyle: React.CSSProperties = {
     padding: '11px 16px',
@@ -120,6 +122,7 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                 cursor: 'pointer',
                 transition: 'background 0.12s',
               }}
+              onClick={() => router.push('/orders/' + order.id)}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--crm-surface-hover)'
               }}
@@ -202,6 +205,7 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                   <Link
                     href={`/orders/${order.id.replace('#', '')}`}
                     title="Просмотр"
+                    onClick={e => e.stopPropagation()}
                     style={{
                       width: 28, height: 28, borderRadius: 6,
                       background: 'var(--crm-s3)', border: 'none',

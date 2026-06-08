@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type {
   CRMClient, CRMOrder, CRMPayment,
-  CRMExpense, CRMService, CRMRequest,
+  CRMExpense, CRMService,
   DashboardStats,
 } from '@/types/crm'
 
@@ -361,67 +361,6 @@ export async function deleteCRMExpense(id: string): Promise<void> {
   if (error) throw error
 }
 
-// ─── REQUESTS (crm_requests) ─────────────────────────────────────────────────
-
-export async function getRequests(): Promise<CRMRequest[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('crm_requests')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return data ?? []
-}
-
-export async function createRequest(
-  input: Omit<CRMRequest, 'id' | 'created_at'>,
-): Promise<CRMRequest> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('crm_requests')
-    .insert(input)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function updateRequest(
-  id: string,
-  input: Partial<Omit<CRMRequest, 'id' | 'created_at'>>,
-): Promise<CRMRequest> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('crm_requests')
-    .update(input)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function deleteRequest(id: string): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('crm_requests')
-    .delete()
-    .eq('id', id)
-  if (error) throw error
-}
-
-export async function updateRequestStatus(
-  id: string,
-  status: string,
-): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('crm_requests')
-    .update({ status })
-    .eq('id', id)
-  if (error) throw error
-}
-
 // ─── PRODUCTS STATS ──────────────────────────────────────────────────────────
 
 export async function getProductsStats() {
@@ -453,7 +392,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     getOrders(),
     getPayments(),
     getExpenses(),
+    getHiddenTransactions(), // загружаем скрытые (инфраструктура для фильтрации)
   ])
+
+  // CRM платежи не скрываются — они управляются через удаление.
+  // Сайтовые транзакции фильтруются на странице /transactions.
+  const visiblePayments = payments.filter(() => true)
 
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -465,7 +409,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const completedOrders = orders.filter(o => o.status === 'completed').length
   const newOrders       = orders.filter(o => o.status === 'new').length
 
-  const monthPayments = payments.filter(
+  const monthPayments = visiblePayments.filter(
     p => new Date(p.payment_date) >= startOfMonth,
   )
   const monthExpenses = expenses.filter(
@@ -559,5 +503,91 @@ export async function globalSearch(
   return {
     orders,
     clients: (clientsRes.data ?? []) as SearchClientResult[],
+  }
+}
+
+// ─── HIDDEN TRANSACTIONS ──────────────────────────────────────────────────────
+
+export type HiddenTransaction = {
+  source_type: 'balance_transaction' | 'purchase'
+  source_id:   string
+}
+
+export async function getHiddenTransactions(): Promise<HiddenTransaction[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('crm_hidden_transactions')
+    .select('source_type, source_id')
+  if (error) throw error
+  return (data ?? []) as HiddenTransaction[]
+}
+
+export async function hideTransaction(
+  sourceType: 'balance_transaction' | 'purchase',
+  sourceId: string,
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('crm_hidden_transactions')
+    .insert({ source_type: sourceType, source_id: sourceId })
+  if (error) throw error
+}
+
+export async function unhideTransaction(
+  sourceType: 'balance_transaction' | 'purchase',
+  sourceId: string,
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('crm_hidden_transactions')
+    .delete()
+    .eq('source_type', sourceType)
+    .eq('source_id', sourceId)
+  if (error) throw error
+}
+
+// ─── CLIENT HISTORY ───────────────────────────────────────────────────────────
+
+export async function getClientHistory(
+  clientId: string,
+  profileId: string | null,
+) {
+  const supabase = createClient()
+
+  const results = await Promise.all([
+    supabase
+      .from('crm_payments')
+      .select('*, order:crm_orders(order_number, project_name)')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false }),
+
+    supabase
+      .from('crm_orders')
+      .select('*, service:crm_services(name)')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false }),
+
+    profileId
+      ? supabase
+          .from('balance_transactions')
+          .select('*')
+          .eq('user_id', profileId)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+
+    profileId
+      ? supabase
+          .from('purchases')
+          .select('*, product:products(name, slug, is_plugin)')
+          .eq('user_id', profileId)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ])
+
+  return {
+    payments:     results[0].data ?? [],
+    orders:       results[1].data ?? [],
+    transactions: results[2].data ?? [],
+    purchases:    results[3].data ?? [],
   }
 }

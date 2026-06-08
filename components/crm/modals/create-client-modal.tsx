@@ -114,7 +114,7 @@ export function CreateClientModal({ open, onClose, onSuccess }: CreateClientModa
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 1000, backdropFilter: 'blur(2px)',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(form, onClose) }}
+      onClick={e => e.stopPropagation()}
     >
       <div
         style={{

@@ -6,7 +6,8 @@ import Link from 'next/link'
 import {
   ArrowLeft, Send, Mail, MapPin, Calendar,
   MessageSquare, ClipboardList, Globe, Pencil, Loader2, AlertCircle,
-  Wallet, Package, ArrowDownCircle, ShoppingCart, TrendingUp,
+  Wallet, Package, ArrowDownCircle, ShoppingCart, TrendingUp, ArrowLeftRight,
+  CreditCard, CheckCircle, ShoppingBag, ArrowUpCircle, Clock,
 } from 'lucide-react'
 import {
   getClientById, getOrdersByClient, getPaymentsByClient, updateCRMClient,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/crm/api'
 import type { BalanceTx, SitePurchase, SiteProfile } from '@/lib/crm/api'
 import { ORDER_STATUS_LABELS } from '@/types/crm'
+import { RefundTransferModal } from '@/components/crm/modals/refund-transfer-modal'
 import { getPreferredPayment, formatMoney } from '@/lib/crm/helpers'
 import { PaymentMethodBadge } from '@/components/crm/status-badge'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
@@ -105,6 +107,110 @@ function formatDate(iso: string) {
 
 function money(n: number) { return formatMoney(n) }
 
+// ── History ───────────────────────────────────────────────────────────────────
+
+type HistoryEventType =
+  | 'order_created'
+  | 'order_completed'
+  | 'payment_received'
+  | 'site_topup'
+  | 'site_purchase'
+  | 'site_spend'
+
+interface HistoryEvent {
+  id:          string
+  type:        HistoryEventType
+  date:        string
+  title:       string
+  subtitle?:   string
+  amount?:     number
+  amountType?: 'income' | 'expense' | 'neutral'
+}
+
+const HISTORY_ICON: Record<HistoryEventType, { icon: typeof CreditCard; color: string; bg: string }> = {
+  payment_received: { icon: CreditCard,    color: 'var(--crm-green)',  bg: 'var(--crm-green-dim)'  },
+  order_created:    { icon: ClipboardList, color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)'   },
+  order_completed:  { icon: CheckCircle,   color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)'   },
+  site_topup:       { icon: Wallet,        color: 'var(--crm-purple)', bg: 'var(--crm-purple-dim)' },
+  site_purchase:    { icon: ShoppingBag,   color: 'var(--crm-orange)', bg: 'var(--crm-orange-dim)' },
+  site_spend:       { icon: ArrowUpCircle, color: 'var(--crm-red)',    bg: 'var(--crm-red-dim)'    },
+}
+
+function buildClientHistory(data: {
+  payments:     any[]
+  orders:       any[]
+  transactions: any[]
+  purchases:    any[]
+}): HistoryEvent[] {
+  const events: HistoryEvent[] = []
+
+  data.payments.forEach(p => {
+    events.push({
+      id:         'pay_' + p.id,
+      type:       'payment_received',
+      date:       p.payment_date || p.created_at,
+      title:      'Оплата заказа',
+      subtitle:   p.order
+        ? '#' + p.order.order_number + ' — ' + p.order.project_name
+        : p.comment || 'Без заказа',
+      amount:     p.amount,
+      amountType: 'income',
+    })
+  })
+
+  data.orders.forEach(o => {
+    events.push({
+      id:         'ord_' + o.id,
+      type:       o.status === 'completed' ? 'order_completed' : 'order_created',
+      date:       o.created_at,
+      title:      o.status === 'completed' ? 'Заказ выполнен' : 'Новый заказ',
+      subtitle:   '#' + o.order_number + ' — ' + o.project_name
+        + (o.service?.name ? ' (' + o.service.name + ')' : ''),
+      amount:     o.amount,
+      amountType: 'neutral',
+    })
+  })
+
+  data.transactions.forEach(t => {
+    if (t.type === 'admin' && t.amount > 0) {
+      events.push({
+        id:         'tx_' + t.id,
+        type:       'site_topup',
+        date:       t.created_at,
+        title:      'Пополнение баланса на сайте',
+        subtitle:   t.description || 'Пополнение',
+        amount:     t.amount,
+        amountType: 'income',
+      })
+    }
+    if (t.type === 'spend') {
+      events.push({
+        id:         'sp_' + t.id,
+        type:       'site_spend',
+        date:       t.created_at,
+        title:      'Списание с баланса',
+        subtitle:   t.description || 'Покупка',
+        amount:     Math.abs(t.amount),
+        amountType: 'expense',
+      })
+    }
+  })
+
+  data.purchases.forEach(p => {
+    events.push({
+      id:         'pur_' + p.id,
+      type:       'site_purchase',
+      date:       p.created_at,
+      title:      'Покупка на сайте',
+      subtitle:   p.product?.name ?? 'Удалённый продукт',
+      amount:     Number(p.amount),
+      amountType: 'income',
+    })
+  })
+
+  return events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+}
+
 // ── Field styles ─────────────────────────────────────────────────────────────
 
 const fs: React.CSSProperties = {
@@ -143,6 +249,9 @@ export default function ClientCardPage() {
   const [loading,      setLoading]      = useState(true)
   const [notFound,     setNotFound]     = useState(false)
   const [showAllTopups,setShowAllTopups]= useState(false)
+  const [refundOpen,   setRefundOpen]   = useState(false)
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'payments' | 'orders' | 'site'>('all')
+  const [historyPage,   setHistoryPage]   = useState(10)
 
   // Edit mode
   const [isEditing,  setIsEditing]   = useState(false)
@@ -205,6 +314,17 @@ export default function ClientCardPage() {
   const totalUnpaid    = orders.reduce((s, o) => s + Math.max(0, o.amount - o.paid), 0)
   const totalOverall   = (client?.total_spent ?? 0) + totalAmount
   const preferred      = useMemo(() => getPreferredPayment(payments), [payments])
+
+  const clientHistory  = useMemo(() => buildClientHistory({
+    payments, orders, transactions, purchases: sitePurchases,
+  }), [payments, orders, transactions, sitePurchases])
+
+  const filteredHistory = useMemo(() => {
+    if (historyFilter === 'all')      return clientHistory
+    if (historyFilter === 'payments') return clientHistory.filter(e => e.type === 'payment_received')
+    if (historyFilter === 'orders')   return clientHistory.filter(e => e.type === 'order_created' || e.type === 'order_completed')
+    return clientHistory.filter(e => e.type === 'site_topup' || e.type === 'site_purchase' || e.type === 'site_spend')
+  }, [clientHistory, historyFilter])
 
   // Site stats
   const topupCount   = transactions.filter(t => t.type === 'admin' && t.amount > 0).length
@@ -539,7 +659,18 @@ export default function ClientCardPage() {
 
           {/* ── Orders table ── */}
           <div>
-            <h2 style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)',margin:'0 0 12px 0' }}>Заказы клиента</h2>
+            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12 }}>
+              <h2 style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)',margin:0 }}>Заказы клиента</h2>
+              <button
+                onClick={() => setRefundOpen(true)}
+                disabled={orders.length === 0}
+                style={{ display:'flex',alignItems:'center',gap:6,height:32,padding:'0 12px',borderRadius:8,background:'transparent',border:'1px solid var(--crm-border2)',color:'var(--crm-yellow)',fontSize:12,fontWeight:600,cursor:orders.length===0?'not-allowed':'pointer',opacity:orders.length===0?0.4:1,transition:'all 0.15s',fontFamily:'inherit' }}
+                onMouseEnter={e=>{if(orders.length>0){e.currentTarget.style.background='var(--crm-yellow-dim)';e.currentTarget.style.borderColor='var(--crm-yellow)'}}}
+                onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor='var(--crm-border2)'}}
+              >
+                <ArrowLeftRight size={13} strokeWidth={2}/>Возврат / Перенос
+              </button>
+            </div>
             {orders.length === 0 ? (
               <div style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:12,padding:'48px 24px',textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:10 }}>
                 <ClipboardList size={40} color="var(--crm-muted)" strokeWidth={1.25}/>
@@ -579,7 +710,115 @@ export default function ClientCardPage() {
               </div>
             )}
           </div>
+
+          {/* ── Activity history ── */}
+          <div style={{ background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:12,padding:20 }}>
+
+            {/* Header */}
+            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}>
+              <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+                <h2 style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)',margin:0 }}>История активности</h2>
+                <span style={{ padding:'2px 8px',borderRadius:6,background:'var(--crm-s3)',fontSize:11,fontWeight:600,color:'var(--crm-muted)' }}>
+                  {clientHistory.length}
+                </span>
+              </div>
+              <div style={{ display:'flex',gap:6 }}>
+                {(['all','payments','orders','site'] as const).map(key => {
+                  const label = key === 'all' ? 'Все' : key === 'payments' ? 'Оплаты' : key === 'orders' ? 'Заказы' : 'Сайт'
+                  const active = historyFilter === key
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => { setHistoryFilter(key); setHistoryPage(10) }}
+                      style={{
+                        height:28, padding:'0 10px', borderRadius:6, fontSize:12, fontWeight:500,
+                        cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s',
+                        background: active ? 'var(--crm-blue-dim)' : 'transparent',
+                        color:      active ? 'var(--crm-blue)' : 'var(--crm-muted)',
+                        border:     active ? '1px solid var(--crm-blue)' : '1px solid var(--crm-border2)',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Events */}
+            {filteredHistory.length === 0 ? (
+              <div style={{ display:'flex',flexDirection:'column',alignItems:'center',gap:10,padding:'40px 0' }}>
+                <Clock size={40} color="var(--crm-muted)" strokeWidth={1.25}/>
+                <div style={{ fontSize:14,fontWeight:600,color:'var(--crm-text)' }}>История активности пуста</div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  {filteredHistory.slice(0, historyPage).map((ev, i, arr) => {
+                    const icfg = HISTORY_ICON[ev.type]
+                    const EvIcon = icfg.icon
+                    return (
+                      <div
+                        key={ev.id}
+                        style={{
+                          display:'flex', alignItems:'center', gap:12, padding:'12px 0',
+                          borderBottom: i < arr.length - 1 ? '1px solid var(--crm-border)' : 'none',
+                        }}
+                      >
+                        <div style={{ width:36,height:36,borderRadius:9,background:icfg.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                          <EvIcon size={16} color={icfg.color} strokeWidth={1.75}/>
+                        </div>
+                        <div style={{ flex:1,minWidth:0 }}>
+                          <div style={{ fontSize:13,fontWeight:600,color:'var(--crm-text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
+                            {ev.title}
+                          </div>
+                          {ev.subtitle && (
+                            <div style={{ fontSize:11,color:'var(--crm-muted)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
+                              {ev.subtitle}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2,flexShrink:0 }}>
+                          {ev.amount !== undefined && (
+                            <div style={{ fontSize:13,fontWeight:700,whiteSpace:'nowrap',color:ev.amountType==='income'?'var(--crm-green)':ev.amountType==='expense'?'var(--crm-red)':'var(--crm-muted)' }}>
+                              <SensitiveValue>
+                                {ev.amountType==='income'?'+':ev.amountType==='expense'?'−':''}{money(ev.amount)}
+                              </SensitiveValue>
+                            </div>
+                          )}
+                          <div style={{ fontSize:11,color:'var(--crm-muted)' }}>{formatDate(ev.date)}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:12,paddingTop:12,borderTop:'1px solid var(--crm-border2)' }}>
+                  <span style={{ fontSize:12,color:'var(--crm-muted)' }}>
+                    Показано {Math.min(historyPage, filteredHistory.length)} из {filteredHistory.length} событий
+                  </span>
+                  {filteredHistory.length > historyPage && (
+                    <button
+                      onClick={() => setHistoryPage(p => p + 10)}
+                      style={{ fontSize:13,color:'var(--crm-blue)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:500 }}
+                    >
+                      Показать ещё
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </>
+      )}
+
+      {client && (
+        <RefundTransferModal
+          open={refundOpen}
+          onClose={() => setRefundOpen(false)}
+          onSuccess={refreshOrdersAndPayments}
+          client={client}
+          orders={orders}
+        />
       )}
 
       <style>{`

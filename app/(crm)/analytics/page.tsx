@@ -3,19 +3,19 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   TrendingUp, TrendingDown, BarChart2, UserPlus,
-  Trophy, Calculator, Star, Target, Clock, AlertTriangle, BarChart3,
+  Trophy, Calculator, Star, Clock, AlertTriangle, BarChart3,
   ShoppingBag, Code, Package,
 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { getPayments, getExpenses, getOrders, getClients, getRequests, getProductsStats } from '@/lib/crm/api'
+import { getPayments, getExpenses, getOrders, getClients, getProductsStats } from '@/lib/crm/api'
 import {
   formatMoney, formatDate, getDateRange, getPrevDateRange,
   getGrouping, getBucketLabel, getBucketMs,
 } from '@/lib/crm/helpers'
-import type { CRMPayment, CRMExpense, CRMOrder, CRMClient, CRMRequest } from '@/types/crm'
+import type { CRMPayment, CRMExpense, CRMOrder, CRMClient } from '@/types/crm'
 
 type ProductStatRow = {
   amount: number
@@ -255,15 +255,14 @@ export default function AnalyticsPage() {
   const [expenses,  setExpenses]  = useState<CRMExpense[]>([])
   const [orders,    setOrders]    = useState<CRMOrder[]>([])
   const [clients,   setClients]   = useState<CRMClient[]>([])
-  const [requests,  setRequests]  = useState<CRMRequest[]>([])
   const [loading,   setLoading]   = useState(true)
   const [showAllPayments, setShowAllPayments] = useState(false)
   const [productsRaw, setProductsRaw] = useState<ProductStatRow[]>([])
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([getPayments(), getExpenses(), getOrders(), getClients(), getRequests(), getProductsStats()])
-      .then(([p, e, o, c, r, ps]) => { setPayments(p); setExpenses(e); setOrders(o); setClients(c); setRequests(r); setProductsRaw(ps as unknown as ProductStatRow[]) })
+    Promise.all([getPayments(), getExpenses(), getOrders(), getClients(), getProductsStats()])
+      .then(([p, e, o, c, ps]) => { setPayments(p); setExpenses(e); setOrders(o); setClients(c); setProductsRaw(ps as unknown as ProductStatRow[]) })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -279,7 +278,6 @@ export default function AnalyticsPage() {
   const fe = useMemo(() => expenses.filter(e => inRange(e.date, from, to)),            [expenses, from, to])
   const fo = useMemo(() => orders.filter(o => inRange(o.created_at, from, to)),        [orders, from, to])
   const fc = useMemo(() => clients.filter(c => inRange(c.created_at, from, to)),       [clients, from, to])
-  const fr       = useMemo(() => requests.filter(r => inRange(r.created_at, from, to)),      [requests, from, to])
   const fProducts = useMemo(() => productsRaw.filter(p => inRange(p.created_at, from, to)), [productsRaw, from, to])
 
   // Previous period
@@ -351,11 +349,6 @@ export default function AnalyticsPage() {
     if (!entries.length) return null
     return entries.reduce((best, cur) => cur.count > best.count ? cur : best)
   }, [fo])
-
-  // Request conversion
-  const totalReq     = fr.length
-  const convertedReq = fr.filter(r => r.status === 'converted').length
-  const conversionPct = totalReq > 0 ? Math.round((convertedReq / totalReq) * 100) : 0
 
   // Avg completion time
   const avgDays = useMemo(() => {
@@ -756,11 +749,6 @@ export default function AnalyticsPage() {
               icon={Star} title="Самый активный клиент"
               value={topClientByOrders ? topClientByOrders.name : '—'}
               sub={topClientByOrders ? `${topClientByOrders.count} заказов · ${formatMoney(topClientByOrders.amount)}` : undefined}
-            />
-            <StatCard
-              icon={Target} title="Конверсия заявок"
-              value={totalReq > 0 ? `${conversionPct}%` : '—'}
-              sub={totalReq > 0 ? `${convertedReq} из ${totalReq} заявок` : 'Нет заявок за период'}
             />
             <StatCard
               icon={Clock} title="Средний срок выполнения"

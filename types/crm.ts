@@ -136,24 +136,6 @@ export interface CRMExpense {
   created_at: string
 }
 
-// ─── CRM Requests (manual, created inside CRM) ───────────────────────────────
-
-export type RequestSource = 'telegram' | 'discord' | 'site' | 'other'
-export type RequestStatus = 'new' | 'in_progress' | 'waiting' | 'converted' | 'rejected'
-
-export interface CRMRequest {
-  id:          string
-  name:        string
-  telegram:    string | null
-  discord:     string | null
-  source:      RequestSource
-  service:     string | null
-  budget:      number
-  description: string | null
-  status:      RequestStatus
-  created_at:  string
-}
-
 // ─── ServiceOrder kept for legacy reference only — no longer used ─────────────
 
 export interface ServiceOrder {

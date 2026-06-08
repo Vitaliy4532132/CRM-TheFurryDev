@@ -70,7 +70,7 @@ function ActionButton({ icon:Icon, danger, title, onClick }: {
   icon: typeof Pencil; danger?: boolean; title: string; onClick?: () => void
 }) {
   return (
-    <button title={title} onClick={onClick} style={{ width:28,height:28,borderRadius:6,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s',flexShrink:0 }}
+    <button title={title} onClick={(e) => { e.stopPropagation(); onClick?.() }} style={{ width:28,height:28,borderRadius:6,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s',flexShrink:0 }}
       onMouseEnter={e=>{e.currentTarget.style.background=danger?'var(--crm-red-dim)':'var(--crm-border2)';e.currentTarget.style.color=danger?'var(--crm-red)':'var(--crm-text)'}}
       onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
       <Icon size={13} strokeWidth={1.75}/>
@@ -251,7 +251,8 @@ export default function ExpensesPage() {
                 )}
 
                 {!loading && filtered.map((exp, i) => (
-                  <tr key={exp.id} style={{ borderBottom:i<filtered.length-1?'1px solid var(--crm-border)':'none',transition:'background 0.12s' }}
+                  <tr key={exp.id} style={{ borderBottom:i<filtered.length-1?'1px solid var(--crm-border)':'none',transition:'background 0.12s',cursor:'pointer' }}
+                    onClick={() => setEditingExpense(exp)}
                     onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
                     onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:'var(--crm-muted)' }}>{i+1}</td>

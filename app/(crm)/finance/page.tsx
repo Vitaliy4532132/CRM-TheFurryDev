@@ -9,7 +9,9 @@ import {
 import { StatCard } from '@/components/crm/stat-card'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
 import { CreatePaymentModal } from '@/components/crm/modals/create-payment-modal'
-import { getPayments, getExpenses, getOrders } from '@/lib/crm/api'
+import { ViewPaymentModal } from '@/components/crm/modals/view-payment-modal'
+import { getPayments, getExpenses, getOrders, getHiddenTransactions } from '@/lib/crm/api'
+import type { HiddenTransaction } from '@/lib/crm/api'
 import { formatMoney, formatDate, PAYMENT_METHOD_LABELS } from '@/lib/crm/helpers'
 import type { CRMPayment, CRMOrder, CRMExpense } from '@/types/crm'
 
@@ -31,6 +33,24 @@ function MethodBadge({ method }: { method: string | null }) {
       {PAYMENT_METHOD_LABELS[key] ?? key}
     </span>
   )
+}
+
+// ── Comment display ───────────────────────────────────────────────────────────
+
+function CommentDisplay({ comment }: { comment: string | null }) {
+  if (!comment) return <span style={{ color: 'var(--crm-muted)' }}>—</span>
+  const idx = comment.indexOf(' | ')
+  if (idx !== -1) {
+    const note = comment.substring(0, idx)
+    const text = comment.substring(idx + 3)
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--crm-muted)' }}>{note}</span>
+        <span style={{ fontSize: 13, color: 'var(--crm-muted)' }}>{text}</span>
+      </div>
+    )
+  }
+  return <span style={{ color: 'var(--crm-muted)' }}>{comment}</span>
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -71,14 +91,21 @@ export default function FinancePage() {
   const [payments,   setPayments]   = useState<CRMPayment[]>([])
   const [expenses,   setExpenses]   = useState<CRMExpense[]>([])
   const [orders,     setOrders]     = useState<CRMOrder[]>([])
+  const [hidden,     setHidden]     = useState<HiddenTransaction[]>([])
   const [loading,    setLoading]    = useState(true)
   const [modalOpen,  setModalOpen]  = useState(false)
+  const [viewPayment, setViewPayment] = useState<CRMPayment | null>(null)
+
+  // Идентификаторы скрытых сайтовых транзакций (инфраструктура — для будущей фильтрации)
+  const hiddenPurchaseIds = hidden.filter(h => h.source_type === 'purchase').map(h => h.source_id)
+  const hiddenBtxIds      = hidden.filter(h => h.source_type === 'balance_transaction').map(h => h.source_id)
+  void hiddenPurchaseIds; void hiddenBtxIds // используются на странице /transactions
 
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [p, e, o] = await Promise.all([getPayments(), getExpenses(), getOrders()])
-      setPayments(p); setExpenses(e); setOrders(o)
+      const [p, e, o, h] = await Promise.all([getPayments(), getExpenses(), getOrders(), getHiddenTransactions()])
+      setPayments(p); setExpenses(e); setOrders(o); setHidden(h)
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }, [])
@@ -202,13 +229,14 @@ export default function FinancePage() {
                 )}
 
                 {!loading && payments.map((p, i) => (
-                  <tr key={p.id} style={{ borderBottom:i<payments.length-1?'1px solid var(--crm-border)':'none',transition:'background 0.12s' }}
+                  <tr key={p.id} style={{ borderBottom:i<payments.length-1?'1px solid var(--crm-border)':'none',transition:'background 0.12s',cursor:'pointer' }}
+                    onClick={() => setViewPayment(p)}
                     onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
                     onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,color:'var(--crm-muted)' }}>{i+1}</td>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,whiteSpace:'nowrap' }}>
                       {p.order_id ? (
-                        <Link href={`/orders/${p.order_id}`} style={{ color:'var(--crm-blue)',textDecoration:'none' }}>
+                        <Link href={`/orders/${p.order_id}`} onClick={e => e.stopPropagation()} style={{ color:'var(--crm-blue)',textDecoration:'none' }}>
                           {p.order ? `#${(p.order as CRMOrder & { order_number: number }).order_number}` : '—'}
                         </Link>
                       ) : '—'}
@@ -229,7 +257,7 @@ export default function FinancePage() {
                       {formatDate(p.payment_date)}
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-muted)' }}>
-                      {p.comment ?? '—'}
+                      <CommentDisplay comment={p.comment ?? null}/>
                     </td>
                   </tr>
                 ))}
@@ -252,6 +280,10 @@ export default function FinancePage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSuccess={() => loadAll()}
+      />
+      <ViewPaymentModal
+        payment={viewPayment}
+        onClose={() => setViewPayment(null)}
       />
     </div>
   )

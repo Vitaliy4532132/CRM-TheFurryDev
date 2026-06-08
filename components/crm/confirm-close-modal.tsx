@@ -19,7 +19,7 @@ export function ConfirmCloseModal({ isOpen, onConfirm, onCancel }: ConfirmCloseM
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 1100,
       }}
-      onClick={e => { if (e.target === e.currentTarget) onCancel() }}
+      onClick={e => e.stopPropagation()}
     >
       <div style={{
         width: 360,

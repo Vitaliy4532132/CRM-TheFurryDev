@@ -57,6 +57,24 @@ const BANK_PLACEHOLDER: Record<string, string> = {
   eu:    'Wise, Revolut, N26...',
   other: 'Название банка / сервиса',
 }
+
+const PAYMENT_NOTE_CONFIG: Record<string, { label: string; placeholder: string }> = {
+  card_ua:    { label: 'Реквизиты карты UA',     placeholder: 'Monobank: 4441 1111 2222 3333 или @username' },
+  card_ru:    { label: 'Реквизиты карты RU',     placeholder: 'Тинькофф: 4276 1111 2222 3333 или @username' },
+  card_eu:    { label: 'Реквизиты карты EU',     placeholder: 'Wise: email или IBAN' },
+  card_other: { label: 'Реквизиты',              placeholder: 'Реквизиты для оплаты' },
+  transfer:   { label: 'Реквизиты для перевода', placeholder: 'Номер счёта, карты или телефона' },
+  crypto:     { label: 'Адрес кошелька',         placeholder: 'TRC20: TXxx... или BTC: 1Axx...' },
+  paypal:     { label: 'PayPal email',           placeholder: 'email@example.com' },
+  other:      { label: 'Заметка к оплате',       placeholder: 'Детали оплаты...' },
+}
+
+const PAY_TYPE_TO_NOTE_KEY: Record<string, string> = {
+  'Перевод': 'transfer',
+  'Крипта':  'crypto',
+  'PayPal':  'paypal',
+  'Другое':  'other',
+}
 const PAY_TYPE_TO_METHOD: Record<string, PaymentMethod> = {
   'Перевод': 'transfer',
   'Крипта':  'crypto',
@@ -96,8 +114,9 @@ export function CreatePaymentModal({
   const [amount,   setAmount]   = useState('')
   const [payType,  setPayType]  = useState('Карта')
   const [cardType, setCardType] = useState('ua')
-  const [bank,     setBank]     = useState('')
-  const [date,     setDate]     = useState('')
+  const [bank,        setBank]        = useState('')
+  const [paymentNote, setPaymentNote] = useState('')
+  const [date,        setDate]        = useState('')
   const [comment,  setComment]  = useState('')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
@@ -114,7 +133,7 @@ export function CreatePaymentModal({
       setSelectedClientId(null)
       setSelectedOrderId(null)
       setAmount('')
-      setPayType('Карта'); setCardType('ua'); setBank('')
+      setPayType('Карта'); setCardType('ua'); setBank(''); setPaymentNote('')
       setDate(new Date().toISOString().split('T')[0])
       setComment(''); setError(null)
       setClientOrders([])
@@ -165,11 +184,11 @@ export function CreatePaymentModal({
   }, [open, onClose])
 
   function buildComment(): string | null {
-    const b = bank.trim()
+    const note = (payType === 'Карта' ? bank : paymentNote).trim()
     const c = comment.trim()
-    if (b && c) return `${b} | ${c}`
-    if (b)      return b
-    if (c)      return c
+    if (note && c) return `${note} | ${c}`
+    if (note)      return note
+    if (c)         return c
     return null
   }
 
@@ -195,14 +214,14 @@ export function CreatePaymentModal({
     }
   }
 
-  const fields = { amount, bank, comment, selectedClientId: selectedClientId ?? '', selectedOrderId: selectedOrderId ?? '' }
+  const fields = { amount, bank, paymentNote, comment, selectedClientId: selectedClientId ?? '', selectedOrderId: selectedOrderId ?? '' }
 
   if (!open) return null
 
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={(e) => { if (e.target===e.currentTarget) handleClose(fields, onClose) }}
+      onClick={e => e.stopPropagation()}
     >
       <div style={{ width:520,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 
@@ -321,10 +340,29 @@ export function CreatePaymentModal({
 
           {/* Способ оплаты */}
           <F label="СПОСОБ ОПЛАТЫ">
-            <select value={payType} onChange={e=>{setPayType(e.target.value);setBank('')}} style={fs} onFocus={fb} onBlur={ub}>
+            <select value={payType} onChange={e=>{setPayType(e.target.value);setBank('');setPaymentNote('')}} style={fs} onFocus={fb} onBlur={ub}>
               {PAY_TYPES.map(m=><option key={m}>{m}</option>)}
             </select>
           </F>
+
+          {/* Заметка к оплате — для не-карточных методов */}
+          {payType !== 'Карта' && (() => {
+            const noteKey = PAY_TYPE_TO_NOTE_KEY[payType]
+            if (!noteKey) return null
+            const cfg = PAYMENT_NOTE_CONFIG[noteKey] ?? { label: 'Заметка к оплате', placeholder: 'Детали оплаты...' }
+            return (
+              <F label={cfg.label.toUpperCase()}>
+                <input
+                  type="text"
+                  placeholder={cfg.placeholder}
+                  value={paymentNote}
+                  onChange={e=>setPaymentNote(e.target.value)}
+                  style={fs}
+                  onFocus={fb} onBlur={ub}
+                />
+              </F>
+            )
+          })()}
 
           {/* Карта — регион + банк */}
           {payType === 'Карта' && (
@@ -334,16 +372,21 @@ export function CreatePaymentModal({
                   {CARD_TYPES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
               </F>
-              <F label="БАНК / СЕРВИС (НЕОБЯЗАТЕЛЬНО)">
-                <input
-                  type="text"
-                  placeholder={BANK_PLACEHOLDER[cardType] ?? 'Название банка'}
-                  value={bank}
-                  onChange={e=>setBank(e.target.value)}
-                  style={fs}
-                  onFocus={fb} onBlur={ub}
-                />
-              </F>
+              {(() => {
+                const noteCfg = PAYMENT_NOTE_CONFIG[`card_${cardType}`] ?? { label: 'Реквизиты', placeholder: BANK_PLACEHOLDER[cardType] ?? 'Реквизиты карты' }
+                return (
+                  <F label={noteCfg.label.toUpperCase()}>
+                    <input
+                      type="text"
+                      placeholder={noteCfg.placeholder}
+                      value={bank}
+                      onChange={e=>setBank(e.target.value)}
+                      style={fs}
+                      onFocus={fb} onBlur={ub}
+                    />
+                  </F>
+                )
+              })()}
             </div>
           )}
 

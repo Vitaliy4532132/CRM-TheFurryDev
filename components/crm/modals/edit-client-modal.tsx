@@ -107,7 +107,7 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 1000, backdropFilter: 'blur(2px)',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(form, onClose) }}
+      onClick={e => e.stopPropagation()}
     >
       <div style={{
         width: 480, maxHeight: '90vh', overflowY: 'auto',

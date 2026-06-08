@@ -36,7 +36,6 @@ const pageTitles: Record<string, string> = {
   '/dashboard': 'Главная',
   '/orders':    'Заказы',
   '/clients':   'Клиенты',
-  '/requests':  'Заявки',
   '/finance':    'Финансы',
   '/analytics':  'Аналитика',
   '/expenses':   'Расходы',

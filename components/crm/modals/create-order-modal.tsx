@@ -43,6 +43,24 @@ const BANK_PLACEHOLDER: Record<string, string> = {
   card_other: 'Название банка или сервиса...',
 }
 
+const PAYMENT_NOTE_CONFIG: Record<string, { label: string; placeholder: string }> = {
+  card_ua:    { label: 'Реквизиты карты UA',     placeholder: 'Monobank: 4441 1111 2222 3333 или @username' },
+  card_ru:    { label: 'Реквизиты карты RU',     placeholder: 'Тинькофф: 4276 1111 2222 3333 или @username' },
+  card_eu:    { label: 'Реквизиты карты EU',     placeholder: 'Wise: email или IBAN' },
+  card_other: { label: 'Реквизиты',              placeholder: 'Реквизиты для оплаты' },
+  transfer:   { label: 'Реквизиты для перевода', placeholder: 'Номер счёта, карты или телефона' },
+  crypto:     { label: 'Адрес кошелька',         placeholder: 'TRC20: TXxx... или BTC: 1Axx...' },
+  paypal:     { label: 'PayPal email',           placeholder: 'email@example.com' },
+  other:      { label: 'Заметка к оплате',       placeholder: 'Детали оплаты...' },
+}
+
+const PAY_TYPE_TO_NOTE_KEY: Record<string, string> = {
+  'transfer': 'transfer',
+  'crypto':   'crypto',
+  'paypal':   'paypal',
+  'other':    'other',
+}
+
 const EMPTY = {
   clientId:    null as string | null,
   serviceId:   '',
@@ -63,6 +81,7 @@ export function CreateOrderModal({
   const { showConfirm, handleClose, confirmClose, cancelClose } = useUnsavedChanges()
   const [cardRegion,       setCardRegion]       = useState('')
   const [bankName,         setBankName]         = useState('')
+  const [paymentNote,      setPaymentNote]      = useState('')
   const [loading,          setLoading]          = useState(false)
   const [error,            setError]            = useState<string | null>(null)
 
@@ -72,6 +91,7 @@ export function CreateOrderModal({
       setPaymentMethod('')
       setCardRegion('')
       setBankName('')
+      setPaymentNote('')
       setError(null)
     }
   }, [open])
@@ -113,8 +133,9 @@ export function CreateOrderModal({
           ? (cardRegion || 'card_other') as PaymentMethod
           : (paymentMethod || 'other') as PaymentMethod
 
-        const paymentComment = bankName.trim()
-          ? bankName.trim() + (form.comment.trim() ? ' | ' + form.comment.trim() : '')
+        const note = (paymentMethod === 'card' ? bankName : paymentNote).trim()
+        const paymentComment = note
+          ? note + (form.comment.trim() ? ' | ' + form.comment.trim() : '')
           : form.comment.trim() || null
 
         await createCRMPayment({
@@ -141,14 +162,14 @@ export function CreateOrderModal({
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={(e) => { if (e.target===e.currentTarget) handleClose({ ...form, paymentMethod, cardRegion, bankName }, onClose) }}
+      onClick={e => e.stopPropagation()}
     >
       <div style={{ width:560,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 
         {/* Header */}
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid var(--crm-border2)',flexShrink:0 }}>
           <span style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)' }}>Создать заказ</span>
-          <button onClick={() => handleClose({ ...form, paymentMethod, cardRegion, bankName }, onClose)} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => handleClose({ ...form, paymentMethod, cardRegion, bankName, paymentNote }, onClose)} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)';e.currentTarget.style.color='var(--crm-red)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             <X size={15} strokeWidth={2}/>
@@ -212,7 +233,7 @@ export function CreateOrderModal({
               {/* Тип */}
               <select
                 value={paymentMethod}
-                onChange={e => { setPaymentMethod(e.target.value); setCardRegion(''); setBankName('') }}
+                onChange={e => { setPaymentMethod(e.target.value); setCardRegion(''); setBankName(''); setPaymentNote('') }}
                 style={fs}
                 onFocus={fb} onBlur={ub}
               >
@@ -240,17 +261,41 @@ export function CreateOrderModal({
                 </select>
               )}
 
-              {/* Банк */}
-              {paymentMethod === 'card' && cardRegion && (
-                <input
-                  type="text"
-                  value={bankName}
-                  onChange={e => setBankName(e.target.value)}
-                  placeholder={BANK_PLACEHOLDER[cardRegion] ?? 'Название банка или сервиса...'}
-                  style={fs}
-                  onFocus={fb} onBlur={ub}
-                />
-              )}
+              {/* Реквизиты карты */}
+              {paymentMethod === 'card' && cardRegion && (() => {
+                const cfg = PAYMENT_NOTE_CONFIG[cardRegion] ?? { label: 'Реквизиты', placeholder: BANK_PLACEHOLDER[cardRegion] ?? 'Реквизиты для оплаты' }
+                return (
+                  <F label={cfg.label.toUpperCase()}>
+                    <input
+                      type="text"
+                      value={bankName}
+                      onChange={e => setBankName(e.target.value)}
+                      placeholder={cfg.placeholder}
+                      style={fs}
+                      onFocus={fb} onBlur={ub}
+                    />
+                  </F>
+                )
+              })()}
+
+              {/* Заметка к оплате — для не-карточных методов */}
+              {paymentMethod !== '' && paymentMethod !== 'card' && (() => {
+                const noteKey = PAY_TYPE_TO_NOTE_KEY[paymentMethod]
+                if (!noteKey) return null
+                const cfg = PAYMENT_NOTE_CONFIG[noteKey] ?? { label: 'Заметка к оплате', placeholder: 'Детали оплаты...' }
+                return (
+                  <F label={cfg.label.toUpperCase()}>
+                    <input
+                      type="text"
+                      value={paymentNote}
+                      onChange={e => setPaymentNote(e.target.value)}
+                      placeholder={cfg.placeholder}
+                      style={fs}
+                      onFocus={fb} onBlur={ub}
+                    />
+                  </F>
+                )
+              })()}
             </div>
           )}
 
@@ -279,7 +324,7 @@ export function CreateOrderModal({
 
         {/* Footer */}
         <div style={{ display:'flex',justifyContent:'flex-end',gap:10,padding:'16px 24px',borderTop:'1px solid var(--crm-border2)',flexShrink:0 }}>
-          <button onClick={() => handleClose({ ...form, paymentMethod, cardRegion, bankName }, onClose)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => handleClose({ ...form, paymentMethod, cardRegion, bankName, paymentNote }, onClose)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-border2)';e.currentTarget.style.color='var(--crm-text)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             Отмена

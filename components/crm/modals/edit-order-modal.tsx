@@ -106,7 +106,7 @@ export function EditOrderModal({
   return (
     <div
       style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(2px)' }}
-      onClick={(e) => { if (e.target===e.currentTarget) handleClose({ clientId, serviceId, projectName, description, amount, paid, deadline, statusRu, comment }, onClose) }}
+      onClick={e => e.stopPropagation()}
     >
       <div style={{ width:560,maxHeight:'90vh',overflowY:'auto',background:'var(--crm-surface)',border:'1px solid var(--crm-border2)',borderRadius:16,display:'flex',flexDirection:'column' }}>
 

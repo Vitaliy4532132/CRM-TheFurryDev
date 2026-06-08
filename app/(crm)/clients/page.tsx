@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { UserPlus, Search, Send, Eye, Pencil, Trash2, Users, ShoppingCart, Globe } from 'lucide-react'
 import Link from 'next/link'
 import { getClients, deleteCRMClient } from '@/lib/crm/api'
@@ -99,13 +100,13 @@ function ActionButton({
   }
   if (href) {
     return (
-      <Link href={href} title={title} style={style} onMouseEnter={enter} onMouseLeave={leave}>
+      <Link href={href} title={title} style={style} onClick={e => e.stopPropagation()} onMouseEnter={enter} onMouseLeave={leave}>
         <Icon size={13} strokeWidth={1.75} />
       </Link>
     )
   }
   return (
-    <button title={title} onClick={onClick} style={style} onMouseEnter={enter} onMouseLeave={leave}>
+    <button title={title} onClick={(e) => { e.stopPropagation(); onClick?.() }} style={style} onMouseEnter={enter} onMouseLeave={leave}>
       <Icon size={13} strokeWidth={1.75} />
     </button>
   )
@@ -137,6 +138,7 @@ function formatDate(iso: string) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ClientsPage() {
+  const router = useRouter()
   const [clients,       setClients]       = useState<CRMClient[]>([])
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState<string | null>(null)
@@ -319,6 +321,7 @@ export default function ClientsPage() {
                     borderBottom: i < filtered.length - 1 ? '1px solid var(--crm-border)' : 'none',
                     cursor: 'pointer', transition: 'background 0.12s',
                   }}
+                  onClick={() => router.push('/clients/' + client.id)}
                   onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--crm-surface-hover)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                 >
@@ -330,6 +333,7 @@ export default function ClientsPage() {
                           href={`/clients/${client.id}`}
                           style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', whiteSpace: 'nowrap', textDecoration: 'none' }}
                           className="crm-client-name-link"
+                          onClick={e => e.stopPropagation()}
                         >
                           {client.name}
                         </Link>
