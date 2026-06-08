@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Eye, Pencil, Trash2, ClipboardList } from 'lucide-react'
 import Link from 'next/link'
 import { getOrders, getClients, getServices, deleteCRMOrder } from '@/lib/crm/api'
@@ -54,8 +55,8 @@ function ActionButton({ icon: Icon, danger, title, href, onClick }: {
   const style: React.CSSProperties = { width:28,height:28,borderRadius:6,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s',flexShrink:0,textDecoration:'none' }
   const enter = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = danger ? 'var(--crm-red-dim)' : 'var(--crm-border2)'; e.currentTarget.style.color = danger ? 'var(--crm-red)' : 'var(--crm-text)' }
   const leave = (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = 'var(--crm-s3)'; e.currentTarget.style.color = 'var(--crm-muted)' }
-  if (href) return <Link href={href} title={title} style={style} onMouseEnter={enter} onMouseLeave={leave}><Icon size={13} strokeWidth={1.75}/></Link>
-  return <button title={title} onClick={onClick} style={style} onMouseEnter={enter} onMouseLeave={leave}><Icon size={13} strokeWidth={1.75}/></button>
+  if (href) return <Link href={href} title={title} style={style} onClick={e => e.stopPropagation()} onMouseEnter={enter} onMouseLeave={leave}><Icon size={13} strokeWidth={1.75}/></Link>
+  return <button title={title} onClick={e => { e.stopPropagation(); onClick?.() }} style={style} onMouseEnter={enter} onMouseLeave={leave}><Icon size={13} strokeWidth={1.75}/></button>
 }
 
 // ── Filter helpers ────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ const thStyle: React.CSSProperties = { padding:'11px 14px',textAlign:'left',font
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
+  const router = useRouter()
   const [orders,        setOrders]        = useState<CRMOrder[]>([])
   const [clients,       setClients]       = useState<CRMClient[]>([])
   const [services,      setServices]      = useState<CRMService[]>([])
@@ -247,6 +249,7 @@ export default function OrdersPage() {
 
                 return (
                   <tr key={order.id} style={{ borderBottom: i < sortedOrders.length-1 ? '1px solid var(--crm-border)' : 'none', cursor:'pointer', transition:'background 0.12s' }}
+                    onClick={() => router.push('/orders/' + order.id)}
                     onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
                     onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
                     <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,whiteSpace:'nowrap',color:order.order_number > 0 ? 'var(--crm-muted)' : 'var(--crm-border2)' }}>
