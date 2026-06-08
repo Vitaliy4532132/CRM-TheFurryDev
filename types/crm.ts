@@ -98,6 +98,7 @@ export interface CRMOrder {
   order_number: number
   client_id:    string | null
   service_id:   string | null
+  profile_id:   string | null   // linked to profiles.id (auto-resolved from client)
   project_name: string
   description:  string | null
   amount:       number

@@ -508,6 +508,7 @@ export default function TransactionsPage() {
                       <div style={{ fontSize: 13, color: 'var(--crm-text)' }}>{formatDate(tx.date)}</div>
                       <div style={{ fontSize: 11, color: 'var(--crm-muted)', marginTop: 2 }}>
                         {(() => {
+                          if (!tx.date.includes('T')) return '—'
                           const d = new Date(tx.date)
                           return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
                         })()}

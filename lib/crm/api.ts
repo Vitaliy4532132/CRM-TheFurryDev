@@ -185,9 +185,21 @@ export async function createCRMOrder(
     & { order_number?: number },
 ): Promise<CRMOrder> {
   const supabase = createClient()
+
+  // Auto-resolve profile_id from the linked client
+  let profile_id: string | null = null
+  if (input.client_id) {
+    const { data: client } = await supabase
+      .from('crm_clients')
+      .select('profile_id')
+      .eq('id', input.client_id)
+      .single()
+    profile_id = client?.profile_id ?? null
+  }
+
   const { data, error } = await supabase
     .from('crm_orders')
-    .insert(input)
+    .insert({ ...input, profile_id })
     .select()
     .single()
   if (error) throw error
@@ -200,9 +212,25 @@ export async function updateCRMOrder(
   input: Partial<Omit<CRMOrder, 'id' | 'order_number' | 'created_at' | 'client' | 'service'>>,
 ): Promise<CRMOrder> {
   const supabase = createClient()
+
+  // If client_id is being changed, re-resolve profile_id
+  let extraFields: { profile_id?: string | null } = {}
+  if ('client_id' in input) {
+    let profile_id: string | null = null
+    if (input.client_id) {
+      const { data: client } = await supabase
+        .from('crm_clients')
+        .select('profile_id')
+        .eq('id', input.client_id)
+        .single()
+      profile_id = client?.profile_id ?? null
+    }
+    extraFields = { profile_id }
+  }
+
   const { data, error } = await supabase
     .from('crm_orders')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update({ ...input, ...extraFields, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single()
