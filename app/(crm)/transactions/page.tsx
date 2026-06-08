@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, BarChart2, List,
   Eye, EyeOff, ArrowLeftRight, Trash2, Search,
@@ -31,6 +32,7 @@ interface UnifiedTransaction {
   amount:       number
   flow:         'income' | 'expense'
   client_name?: string
+  order_id?:    string | null
   is_hidden:    boolean
 }
 
@@ -70,6 +72,7 @@ function buildTransactions(
       amount:      p.amount,
       flow:        'income',
       client_name: p.client?.name,
+      order_id:    p.order_id ?? null,
       is_hidden:   false,
     })
   })
@@ -215,6 +218,7 @@ function Divider() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TransactionsPage() {
+  const router = useRouter()
   const [payments,    setPayments]    = useState<CRMPayment[]>([])
   const [expenses,    setExpenses]    = useState<CRMExpense[]>([])
   const [balanceTx,   setBalanceTx]   = useState<any[]>([])
@@ -479,6 +483,7 @@ export default function TransactionsPage() {
                 const isLast = i === paginated.length - 1
                 const isSite = tx.source_type === 'balance_transaction' || tx.source_type === 'purchase'
                 const isCRM  = tx.source_type === 'payment' || tx.source_type === 'expense'
+                const isClickable = !!tx.order_id
 
                 return (
                   <tr
@@ -486,11 +491,13 @@ export default function TransactionsPage() {
                     style={{
                       borderBottom: isLast ? 'none' : '1px solid var(--crm-border)',
                       transition: 'background 0.12s',
+                      cursor:  isClickable ? 'pointer' : 'default',
                       opacity:    tx.is_hidden ? 0.4 : 1,
                       background: tx.is_hidden ? 'rgba(239,68,68,0.05)' : 'transparent',
                     }}
+                    onClick={isClickable ? () => router.push('/orders/' + tx.order_id!) : undefined}
                     onMouseEnter={e => {
-                      if (!tx.is_hidden) e.currentTarget.style.background = 'var(--crm-surface-hover)'
+                      if (isClickable && !tx.is_hidden) e.currentTarget.style.background = 'var(--crm-surface-hover)'
                     }}
                     onMouseLeave={e => {
                       e.currentTarget.style.background = tx.is_hidden ? 'rgba(239,68,68,0.05)' : 'transparent'

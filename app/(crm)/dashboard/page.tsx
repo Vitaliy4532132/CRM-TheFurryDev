@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ClipboardList, Clock, CheckCircle, Sparkles,
@@ -39,14 +40,16 @@ function PaymentChip({ amount, paid }: { amount: number; paid: number }) {
 }
 
 function OrderRow({ order, isLast }: { order: CRMOrder; isLast: boolean }) {
+  const router = useRouter()
   const thStyle: React.CSSProperties = { padding:'11px 16px',textAlign:'left',fontSize:11,fontWeight:600,letterSpacing:'0.06em',color:'var(--crm-muted)',textTransform:'uppercase',borderBottom:'1px solid var(--crm-border2)',whiteSpace:'nowrap' }
   void thStyle
   return (
     <tr style={{ borderBottom: isLast ? 'none' : '1px solid var(--crm-border)', cursor:'pointer', transition:'background 0.12s' }}
+      onClick={() => router.push('/orders/' + order.id)}
       onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
       onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
       <td style={{ padding:'13px 16px',fontSize:13,fontWeight:600,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
-        <Link href={`/orders/${order.id}`} style={{ color:'inherit',textDecoration:'none' }} className="crm-order-id-link">
+        <Link href={`/orders/${order.id}`} style={{ color:'inherit',textDecoration:'none' }} className="crm-order-id-link" onClick={e => e.stopPropagation()}>
           #{order.order_number}
         </Link>
       </td>
@@ -69,7 +72,7 @@ function OrderRow({ order, isLast }: { order: CRMOrder; isLast: boolean }) {
         {formatDate(order.created_at)}
       </td>
       <td style={{ padding:'13px 16px' }}>
-        <Link href={`/orders/${order.id}`} title="Просмотр" style={{ width:28,height:28,borderRadius:6,background:'var(--crm-s3)',display:'inline-flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',textDecoration:'none',flexShrink:0,transition:'background 0.15s,color 0.15s' }} className="crm-eye-link">
+        <Link href={`/orders/${order.id}`} title="Просмотр" style={{ width:28,height:28,borderRadius:6,background:'var(--crm-s3)',display:'inline-flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',textDecoration:'none',flexShrink:0,transition:'background 0.15s,color 0.15s' }} className="crm-eye-link" onClick={e => e.stopPropagation()}>
           <ClipboardList size={13} strokeWidth={1.75}/>
         </Link>
       </td>

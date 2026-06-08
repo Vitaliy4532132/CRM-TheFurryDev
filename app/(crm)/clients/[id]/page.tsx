@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Send, Mail, MapPin, Calendar,
@@ -240,6 +240,7 @@ const thStyle: React.CSSProperties = {
 
 export default function ClientCardPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const [client,       setClient]       = useState<CRMClient | null>(null)
   const [orders,       setOrders]       = useState<CRMOrder[]>([])
   const [payments,     setPayments]     = useState<CRMPayment[]>([])
@@ -692,9 +693,14 @@ export default function ClientCardPage() {
                   </thead>
                   <tbody>
                     {orders.map((order, i) => (
-                      <tr key={order.id} style={{ borderBottom:i<orders.length-1?'1px solid var(--crm-border)':'none' }}>
+                      <tr key={order.id}
+                        style={{ borderBottom:i<orders.length-1?'1px solid var(--crm-border)':'none', cursor:'pointer', transition:'background 0.12s' }}
+                        onClick={() => router.push('/orders/' + order.id)}
+                        onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
+                        onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}
+                      >
                         <td style={{ padding:'12px 14px',fontSize:13,fontWeight:600,whiteSpace:'nowrap' }}>
-                          <Link href={`/orders/${order.id}`} style={{ color:'var(--crm-muted)',textDecoration:'none' }} className="crm-order-link">
+                          <Link href={`/orders/${order.id}`} style={{ color:'var(--crm-muted)',textDecoration:'none' }} className="crm-order-link" onClick={e => e.stopPropagation()}>
                             {order.order_number > 0 ? `#${order.order_number}` : '#x'}
                           </Link>
                         </td>
