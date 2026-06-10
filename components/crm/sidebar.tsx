@@ -12,6 +12,7 @@ import {
   BarChart3,
   ArrowDownCircle,
   Layers,
+  Trash2,
   LogOut,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/analytics',     label: 'Аналитика',   icon: BarChart3 },
   { href: '/expenses',   label: 'Расходы',   icon: ArrowDownCircle },
   { href: '/services',   label: 'Услуги',    icon: Layers },
+  { href: '/trash',      label: 'Корзина',   icon: Trash2 },
   // Настройки скрыты: страница пока декоративная (кнопки не сохраняют).
   // Вернуть, когда будет реализована: { href: '/settings', label: 'Настройки', icon: Settings },
 ]

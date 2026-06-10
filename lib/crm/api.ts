@@ -263,6 +263,7 @@ export async function getPayments(): Promise<CRMPayment[]> {
       order:crm_orders(id, order_number, project_name),
       client:crm_clients(id, name)
     `)
+    .is('deleted_at', null)
     .order('payment_date', { ascending: false })
   if (error) throw error
   const result = data ?? []
@@ -452,7 +453,6 @@ export async function createCRMPayment(
 
 export async function deleteCRMPayment(id: string): Promise<void> {
   const supabase = createClient()
-  // Запоминаем платёж до удаления, чтобы скорректировать paid заказа
   const { data: payment } = await supabase
     .from('crm_payments')
     .select('order_id, amount')
@@ -460,10 +460,26 @@ export async function deleteCRMPayment(id: string): Promise<void> {
     .single()
   const { error } = await supabase
     .from('crm_payments')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', id)
   if (error) throw error
   if (payment?.order_id) await adjustOrderPaid(payment.order_id, -payment.amount)
+  invalidateCache('payments', 'orders', 'dashboard')
+}
+
+export async function restoreCRMPayment(id: string): Promise<void> {
+  const supabase = createClient()
+  const { data: payment } = await supabase
+    .from('crm_payments')
+    .select('order_id, amount')
+    .eq('id', id)
+    .single()
+  const { error } = await supabase
+    .from('crm_payments')
+    .update({ deleted_at: null })
+    .eq('id', id)
+  if (error) throw error
+  if (payment?.order_id) await adjustOrderPaid(payment.order_id, payment.amount)
   invalidateCache('payments', 'orders', 'dashboard')
 }
 
@@ -477,6 +493,7 @@ export async function getExpenses(): Promise<CRMExpense[]> {
   const { data, error } = await supabase
     .from('crm_expenses')
     .select('*')
+    .is('deleted_at', null)
     .order('date', { ascending: false })
   if (error) throw error
   const result = data ?? []
@@ -518,10 +535,76 @@ export async function deleteCRMExpense(id: string): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase
     .from('crm_expenses')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', id)
   if (error) throw error
   invalidateCache('expenses', 'dashboard')
+}
+
+export async function restoreCRMExpense(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('crm_expenses')
+    .update({ deleted_at: null })
+    .eq('id', id)
+  if (error) throw error
+  invalidateCache('expenses', 'dashboard')
+}
+
+export type DeletedItem = {
+  id:         string
+  kind:       'payment' | 'expense'
+  title:      string
+  subtitle:   string
+  amount:     number
+  deleted_at: string
+  order_id?:  string | null
+}
+
+export async function getDeletedTransactions(): Promise<DeletedItem[]> {
+  const supabase = createClient()
+  const [{ data: payments }, { data: expenses }] = await Promise.all([
+    supabase
+      .from('crm_payments')
+      .select('id, amount, deleted_at, order_id, comment, order:crm_orders(order_number, project_name), client:crm_clients(name)')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false }),
+    supabase
+      .from('crm_expenses')
+      .select('id, name, amount, deleted_at, category')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false }),
+  ])
+
+  const result: DeletedItem[] = []
+
+  for (const p of payments ?? []) {
+    const order = (p as Record<string, unknown>).order as { order_number: string; project_name: string } | null
+    const client = (p as Record<string, unknown>).client as { name: string } | null
+    result.push({
+      id:         p.id,
+      kind:       'payment',
+      title:      'Оплата заказа',
+      subtitle:   order ? `#${order.order_number} — ${order.project_name}` : (p.comment || '—'),
+      amount:     p.amount,
+      deleted_at: p.deleted_at,
+      order_id:   p.order_id ?? null,
+    })
+    void client
+  }
+
+  for (const e of expenses ?? []) {
+    result.push({
+      id:         e.id,
+      kind:       'expense',
+      title:      e.name,
+      subtitle:   e.category,
+      amount:     e.amount,
+      deleted_at: e.deleted_at,
+    })
+  }
+
+  return result.sort((a, b) => new Date(b.deleted_at).getTime() - new Date(a.deleted_at).getTime())
 }
 
 // ─── PRODUCTS STATS ──────────────────────────────────────────────────────────
