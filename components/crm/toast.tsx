@@ -9,10 +9,16 @@ import { CheckCircle, AlertCircle, X } from 'lucide-react'
 
 type ToastKind = 'success' | 'error'
 
+interface ToastAction {
+  label:   string
+  onClick: () => void
+}
+
 interface ToastItem {
   id:      number
   kind:    ToastKind
   message: string
+  action?: ToastAction
 }
 
 type Listener = (toasts: ToastItem[]) => void
@@ -21,11 +27,11 @@ let toasts: ToastItem[] = []
 let listener: Listener | null = null
 let nextId = 1
 
-function push(kind: ToastKind, message: string) {
-  const item: ToastItem = { id: nextId++, kind, message }
+function push(kind: ToastKind, message: string, action?: ToastAction) {
+  const item: ToastItem = { id: nextId++, kind, message, action }
   toasts = [...toasts, item]
   listener?.(toasts)
-  setTimeout(() => dismiss(item.id), 4000)
+  setTimeout(() => dismiss(item.id), action ? 7000 : 4000)
 }
 
 function dismiss(id: number) {
@@ -34,7 +40,7 @@ function dismiss(id: number) {
 }
 
 export const toast = {
-  success: (message: string) => push('success', message),
+  success: (message: string, action?: ToastAction) => push('success', message, action),
   error:   (message: string) => push('error', message),
 }
 
@@ -70,6 +76,19 @@ export function Toaster() {
             : <AlertCircle size={16} color="var(--crm-red)"   strokeWidth={2} style={{ flexShrink: 0 }}/>
           }
           <span style={{ flex: 1, fontSize: 13, color: 'var(--crm-text)', lineHeight: 1.4 }}>{t.message}</span>
+          {t.action && (
+            <button
+              onClick={() => { t.action!.onClick(); dismiss(t.id) }}
+              style={{
+                height: 26, padding: '0 10px', borderRadius: 6, flexShrink: 0,
+                background: 'var(--crm-blue-dim)', border: '1px solid var(--crm-blue)',
+                cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                color: 'var(--crm-blue)', whiteSpace: 'nowrap', fontFamily: 'inherit',
+              }}
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
             onClick={() => dismiss(t.id)}
             style={{

@@ -312,15 +312,19 @@ export default function TransactionsPage() {
   async function confirmDelete() {
     if (!deletingTx) return
     const tx = deletingTx
+    setDeletingTx(null)
     try {
       if (tx.source_type === 'payment') await deleteCRMPayment(tx.source_id)
       else await deleteCRMExpense(tx.source_id)
       await loadAll(true)
-      toast.success('Транзакция удалена')
+      toast.success(
+        'Транзакция удалена',
+        tx.order_id
+          ? { label: 'Открыть заказ', onClick: () => router.push('/orders/' + tx.order_id!) }
+          : undefined,
+      )
     } catch {
       toast.error('Не удалось удалить транзакцию')
-    } finally {
-      setDeletingTx(null)
     }
   }
 
