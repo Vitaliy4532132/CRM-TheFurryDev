@@ -4,13 +4,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, BarChart2, List,
-  Eye, EyeOff, ArrowLeftRight, Trash2, Search,
+  ArrowLeftRight, Trash2, Search,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import {
   getPayments, getExpenses,
   getAllSiteTransactions, getAllSitePurchases,
-  getHiddenTransactions, hideTransaction, unhideTransaction,
   deleteCRMPayment, deleteCRMExpense,
 } from '@/lib/crm/api'
 import type { SiteBalanceTx, SitePurchaseRow } from '@/lib/crm/api'
@@ -40,7 +39,6 @@ interface UnifiedTransaction {
   flow:         Flow
   client_name?: string
   order_id?:    string | null
-  is_hidden:    boolean
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -61,12 +59,8 @@ function buildTransactions(
   expenses:  CRMExpense[],
   balanceTx: SiteBalanceTx[],
   purchases: SitePurchaseRow[],
-  hidden:    { source_type: string; source_id: string }[],
 ): UnifiedTransaction[] {
   const all: UnifiedTransaction[] = []
-
-  // Set для O(1)-проверки скрытых вместо .some() в цикле
-  const hiddenSet = new Set(hidden.map(h => h.source_type + ':' + h.source_id))
 
   payments.forEach(p => {
     const order = p.order
@@ -83,7 +77,6 @@ function buildTransactions(
       flow:        'income',
       client_name: p.client?.name,
       order_id:    p.order_id ?? null,
-      is_hidden:   false,
     })
   })
 
@@ -97,7 +90,6 @@ function buildTransactions(
       subtitle:    EXPENSE_CATEGORY_LABELS[e.category] || e.category,
       amount:      e.amount,
       flow:        'expense',
-      is_hidden:   false,
     })
   })
 
@@ -114,11 +106,9 @@ function buildTransactions(
         amount:      t.amount,
         flow:        'income',
         client_name: t.profile?.nickname ?? undefined,
-        is_hidden:   hiddenSet.has('balance_transaction:' + t.id),
       })
     })
 
-  // Покупки с баланса — нейтральные: деньги уже зачтены при пополнении
   purchases.forEach(p => {
     all.push({
       id:          'pur_' + p.id,
@@ -130,7 +120,6 @@ function buildTransactions(
       amount:      Number(p.amount),
       flow:        'neutral',
       client_name: p.profile?.nickname ?? undefined,
-      is_hidden:   hiddenSet.has('purchase:' + p.id),
     })
   })
 
@@ -234,10 +223,8 @@ export default function TransactionsPage() {
   const [expenses,    setExpenses]    = useState<CRMExpense[]>([])
   const [balanceTx,   setBalanceTx]   = useState<SiteBalanceTx[]>([])
   const [purchases,   setPurchases]   = useState<SitePurchaseRow[]>([])
-  const [hidden,      setHidden]      = useState<{ source_type: string; source_id: string }[]>([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState<string | null>(null)
-  const [showHidden,  setShowHidden]  = useState(false)
   const [search,      setSearch]      = useState('')
   const [flowFilter,  setFlowFilter]  = useState<'all' | 'income' | 'expense'>('all')
   const [srcFilter,   setSrcFilter]   = useState<'all' | SourceType>('all')
@@ -250,18 +237,16 @@ export default function TransactionsPage() {
     if (!quiet) setLoading(true)
     setError(null)
     try {
-      const [p, e, btx, pur, h] = await Promise.all([
+      const [p, e, btx, pur] = await Promise.all([
         getPayments(),
         getExpenses(),
         getAllSiteTransactions(),
         getAllSitePurchases(),
-        getHiddenTransactions(),
       ])
       setPayments(p)
       setExpenses(e)
       setBalanceTx(btx)
       setPurchases(pur)
-      setHidden(h)
     } catch {
       setError('Не удалось загрузить транзакции')
     } finally {
@@ -270,17 +255,17 @@ export default function TransactionsPage() {
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
-  useEffect(() => { setPage(1) }, [search, flowFilter, srcFilter, period, showHidden])
+  useEffect(() => { setPage(1) }, [search, flowFilter, srcFilter, period])
 
   // ── Build data ───────────────────────────────────────────────────────────────
 
   const allTx = useMemo(
-    () => buildTransactions(payments, expenses, balanceTx, purchases, hidden),
-    [payments, expenses, balanceTx, purchases, hidden],
+    () => buildTransactions(payments, expenses, balanceTx, purchases),
+    [payments, expenses, balanceTx, purchases],
   )
 
   const filtered = useMemo(() => {
-    let list = showHidden ? allTx : allTx.filter(t => !t.is_hidden)
+    let list = allTx
 
     if (period !== 'all') {
       const days   = period === '7d' ? 7 : period === '30d' ? 30 : 90
@@ -298,15 +283,14 @@ export default function TransactionsPage() {
       )
     }
     return list
-  }, [allTx, showHidden, period, flowFilter, srcFilter, search])
+  }, [allTx, period, flowFilter, srcFilter, search])
 
-  // ── KPI (только видимые, без учёта фильтров) ─────────────────────────────────
+  // ── KPI ──────────────────────────────────────────────────────────────────────
 
-  const visibleAll = useMemo(() => allTx.filter(t => !t.is_hidden), [allTx])
-  const kpiIncome  = visibleAll.filter(t => t.flow === 'income').reduce((s, t) => s + t.amount, 0)
-  const kpiExpense = visibleAll.filter(t => t.flow === 'expense').reduce((s, t) => s + t.amount, 0)
+  const kpiIncome  = allTx.filter(t => t.flow === 'income').reduce((s, t) => s + t.amount, 0)
+  const kpiExpense = allTx.filter(t => t.flow === 'expense').reduce((s, t) => s + t.amount, 0)
   const kpiProfit  = kpiIncome - kpiExpense
-  const kpiCount   = visibleAll.length
+  const kpiCount   = allTx.length
 
   // ── Pagination ───────────────────────────────────────────────────────────────
 
@@ -340,26 +324,6 @@ export default function TransactionsPage() {
     }
   }
 
-  async function handleHide(tx: UnifiedTransaction, e: React.MouseEvent) {
-    e.stopPropagation()
-    try {
-      await hideTransaction(tx.source_type as 'balance_transaction' | 'purchase', tx.source_id)
-      await loadAll(true)
-    } catch {
-      toast.error('Не удалось скрыть транзакцию')
-    }
-  }
-
-  async function handleUnhide(tx: UnifiedTransaction, e: React.MouseEvent) {
-    e.stopPropagation()
-    try {
-      await unhideTransaction(tx.source_type as 'balance_transaction' | 'purchase', tx.source_id)
-      await loadAll(true)
-    } catch {
-      toast.error('Не удалось показать транзакцию')
-    }
-  }
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -369,24 +333,6 @@ export default function TransactionsPage() {
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--crm-text)', margin: 0 }}>Транзакции</h1>
-        <button
-          onClick={() => setShowHidden(v => !v)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            height: 36, padding: '0 14px', borderRadius: 8,
-            background:   showHidden ? 'var(--crm-red-dim)' : 'var(--crm-s3)',
-            border:       showHidden ? '1px solid var(--crm-red)' : '1px solid var(--crm-border2)',
-            color:        showHidden ? 'var(--crm-red)' : 'var(--crm-muted)',
-            fontSize: 13, fontWeight: showHidden ? 600 : 400,
-            cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
-          }}
-        >
-          {showHidden
-            ? <Eye    size={14} strokeWidth={2} />
-            : <EyeOff size={14} strokeWidth={2} />
-          }
-          {showHidden ? 'Скрытые показаны' : 'Показать скрытые'}
-        </button>
       </div>
 
       {error && (
@@ -512,7 +458,6 @@ export default function TransactionsPage() {
               {!loading && paginated.map((tx, i) => {
                 const src    = SOURCE_BADGE[tx.source_type]
                 const isLast = i === paginated.length - 1
-                const isSite = tx.source_type === 'balance_transaction' || tx.source_type === 'purchase'
                 const isCRM  = tx.source_type === 'payment' || tx.source_type === 'expense'
                 const isClickable = !!tx.order_id
 
@@ -522,16 +467,14 @@ export default function TransactionsPage() {
                     style={{
                       borderBottom: isLast ? 'none' : '1px solid var(--crm-border)',
                       transition: 'background 0.12s',
-                      cursor:  isClickable ? 'pointer' : 'default',
-                      opacity:    tx.is_hidden ? 0.4 : 1,
-                      background: tx.is_hidden ? 'rgba(239,68,68,0.05)' : 'transparent',
+                      cursor: isClickable ? 'pointer' : 'default',
                     }}
                     onClick={isClickable ? () => router.push('/orders/' + tx.order_id!) : undefined}
                     onMouseEnter={e => {
-                      if (isClickable && !tx.is_hidden) e.currentTarget.style.background = 'var(--crm-surface-hover)'
+                      if (isClickable) e.currentTarget.style.background = 'var(--crm-surface-hover)'
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = tx.is_hidden ? 'rgba(239,68,68,0.05)' : 'transparent'
+                      e.currentTarget.style.background = 'transparent'
                     }}
                   >
                     {/* Дата */}
@@ -562,9 +505,6 @@ export default function TransactionsPage() {
                     <td style={{ padding: '11px 14px', minWidth: 160 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)' }}>{tx.title}</span>
-                        {tx.is_hidden && (
-                          <span style={{ fontSize: 11, color: 'var(--crm-muted)' }}>(скрыто)</span>
-                        )}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--crm-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>
                         {tx.subtitle}
@@ -612,24 +552,6 @@ export default function TransactionsPage() {
                             color="var(--crm-red)"
                             hoverBg="var(--crm-red-dim)"
                             onClick={e => { e.stopPropagation(); setDeletingTx(tx) }}
-                          />
-                        )}
-                        {isSite && !tx.is_hidden && (
-                          <ActionBtn
-                            icon={EyeOff}
-                            title="Скрыть"
-                            color="var(--crm-muted)"
-                            hoverBg="var(--crm-s3)"
-                            onClick={e => handleHide(tx, e)}
-                          />
-                        )}
-                        {isSite && tx.is_hidden && showHidden && (
-                          <ActionBtn
-                            icon={Eye}
-                            title="Показать"
-                            color="var(--crm-blue)"
-                            hoverBg="var(--crm-blue-dim)"
-                            onClick={e => handleUnhide(tx, e)}
                           />
                         )}
                       </div>
