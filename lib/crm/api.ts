@@ -341,6 +341,20 @@ export type SitePurchaseRow = {
   profile:    { nickname: string | null } | null
 }
 
+async function fetchProfileMap(
+  supabase: ReturnType<typeof createClient>,
+  userIds: string[],
+): Promise<Map<string, { nickname: string | null; telegram: string | null }>> {
+  if (!userIds.length) return new Map()
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, nickname, telegram')
+    .in('id', userIds)
+  const map = new Map<string, { nickname: string | null; telegram: string | null }>()
+  for (const p of data ?? []) map.set(p.id, { nickname: p.nickname ?? null, telegram: p.telegram ?? null })
+  return map
+}
+
 export async function getAllSiteTransactions(): Promise<SiteBalanceTx[]> {
   const cached = getCached<SiteBalanceTx[]>('site_btx')
   if (cached) return cached
@@ -348,11 +362,14 @@ export async function getAllSiteTransactions(): Promise<SiteBalanceTx[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('balance_transactions')
-    .select('*, profile:profiles(nickname, telegram)')
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(1000)
   if (error) throw error
-  const result = (data ?? []) as SiteBalanceTx[]
+
+  const rows = data ?? []
+  const profileMap = await fetchProfileMap(supabase, [...new Set(rows.map((r: BalanceTx) => r.user_id))])
+  const result: SiteBalanceTx[] = rows.map((r: BalanceTx) => ({ ...r, profile: profileMap.get(r.user_id) ?? null }))
   setCached('site_btx', result)
   return result
 }
@@ -364,11 +381,14 @@ export async function getAllSitePurchases(): Promise<SitePurchaseRow[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('purchases')
-    .select('id, user_id, amount, created_at, product:products(name, slug), profile:profiles(nickname)')
+    .select('id, user_id, amount, created_at, product:products(name, slug)')
     .order('created_at', { ascending: false })
     .limit(1000)
   if (error) throw error
-  const result = (data ?? []) as unknown as SitePurchaseRow[]
+
+  const rows = (data ?? []) as unknown as (Omit<SitePurchaseRow, 'profile'>)[]
+  const profileMap = await fetchProfileMap(supabase, [...new Set(rows.map(r => r.user_id))])
+  const result: SitePurchaseRow[] = rows.map(r => ({ ...r, profile: profileMap.get(r.user_id) ?? null }))
   setCached('site_purchases', result)
   return result
 }
