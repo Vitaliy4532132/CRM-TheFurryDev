@@ -98,37 +98,49 @@ function LoginContent() {
     const email    = (form.elements.namedItem('email')    as HTMLInputElement).value
     const password = (form.elements.namedItem('password') as HTMLInputElement).value
 
-    const { error: authError } = await createClient().auth.signInWithPassword({ email, password })
+    try {
+      const { error: authError } = await createClient().auth.signInWithPassword({ email, password })
 
-    if (authError) {
+      if (authError) {
+        setLoading(false)
+        setError(true)
+        setShake(true)
+        setTimeout(() => setShake(false), 500)
+      } else {
+        router.push('/dashboard')
+        router.refresh()
+      }
+    } catch {
+      // Сетевой сбой — сбрасываем loading, чтобы кнопка не зависла
       setLoading(false)
       setError(true)
       setShake(true)
       setTimeout(() => setShake(false), 500)
-    } else {
-      router.push('/dashboard')
-      router.refresh()
     }
   }
 
   // ── OAuth ──
 
-  async function handleGoogleLogin() {
-    setOauthLoading('google')
-    await createClient().auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    })
-    setOauthLoading(null)
-  }
-
-  async function handleDiscordLogin() {
-    setOauthLoading('discord')
-    await createClient().auth.signInWithOAuth({
-      provider: 'discord',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    })
-    setOauthLoading(null)
+  async function handleOAuthLogin(provider: 'google' | 'discord') {
+    setOauthLoading(provider)
+    try {
+      const { error: oauthError } = await createClient().auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      })
+      // При успехе происходит редирект; сюда попадаем только при ошибке
+      if (oauthError) {
+        setOauthLoading(null)
+        setError(true)
+        setShake(true)
+        setTimeout(() => setShake(false), 500)
+      }
+    } catch {
+      setOauthLoading(null)
+      setError(true)
+      setShake(true)
+      setTimeout(() => setShake(false), 500)
+    }
   }
 
   // ── Styles ──
@@ -265,7 +277,7 @@ function LoginContent() {
               : <GoogleIcon />}
             label="Google"
             hoverBorder="var(--crm-blue)"
-            onClick={handleGoogleLogin}
+            onClick={() => handleOAuthLogin('google')}
             disabled={anyLoading}
           />
           <OAuthButton
@@ -274,7 +286,7 @@ function LoginContent() {
               : <DiscordIcon />}
             label="Discord"
             hoverBorder="#5865F2"
-            onClick={handleDiscordLogin}
+            onClick={() => handleOAuthLogin('discord')}
             disabled={anyLoading}
           />
         </div>

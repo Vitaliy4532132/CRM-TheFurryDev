@@ -181,7 +181,7 @@ export async function getOrdersByClient(clientId: string): Promise<CRMOrder[]> {
 }
 
 export async function createCRMOrder(
-  input: Omit<CRMOrder, 'id' | 'order_number' | 'created_at' | 'updated_at' | 'client' | 'service'>
+  input: Omit<CRMOrder, 'id' | 'order_number' | 'created_at' | 'updated_at' | 'client' | 'service' | 'profile_id'>
     & { order_number?: number },
 ): Promise<CRMOrder> {
   const supabase = createClient()
@@ -209,7 +209,7 @@ export async function createCRMOrder(
 
 export async function updateCRMOrder(
   id: string,
-  input: Partial<Omit<CRMOrder, 'id' | 'order_number' | 'created_at' | 'client' | 'service'>>,
+  input: Partial<Omit<CRMOrder, 'id' | 'order_number' | 'created_at' | 'client' | 'service' | 'profile_id'>>,
 ): Promise<CRMOrder> {
   const supabase = createClient()
 
@@ -326,6 +326,53 @@ export async function getSiteProfile(profileId: string): Promise<SiteProfile | n
   return data
 }
 
+// Все сайтовые транзакции/покупки для страницы /transactions.
+// Кешируются (TTL 30с) и ограничены последними 1000 записей.
+export type SiteBalanceTx = BalanceTx & {
+  profile: { nickname: string | null; telegram: string | null } | null
+}
+
+export type SitePurchaseRow = {
+  id:         string
+  user_id:    string
+  amount:     number
+  created_at: string
+  product:    { name: string; slug: string } | null
+  profile:    { nickname: string | null } | null
+}
+
+export async function getAllSiteTransactions(): Promise<SiteBalanceTx[]> {
+  const cached = getCached<SiteBalanceTx[]>('site_btx')
+  if (cached) return cached
+
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('balance_transactions')
+    .select('*, profile:profiles(nickname, telegram)')
+    .order('created_at', { ascending: false })
+    .limit(1000)
+  if (error) throw error
+  const result = (data ?? []) as SiteBalanceTx[]
+  setCached('site_btx', result)
+  return result
+}
+
+export async function getAllSitePurchases(): Promise<SitePurchaseRow[]> {
+  const cached = getCached<SitePurchaseRow[]>('site_purchases')
+  if (cached) return cached
+
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('id, user_id, amount, created_at, product:products(name, slug), profile:profiles(nickname)')
+    .order('created_at', { ascending: false })
+    .limit(1000)
+  if (error) throw error
+  const result = (data ?? []) as unknown as SitePurchaseRow[]
+  setCached('site_purchases', result)
+  return result
+}
+
 export async function getPaymentsByClient(clientId: string): Promise<CRMPayment[]> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -348,6 +395,26 @@ export async function getPaymentsByOrder(orderId: string): Promise<CRMPayment[]>
   return data ?? []
 }
 
+// Сдвигает crm_orders.paid на delta. Логика paid живёт в коде —
+// триггеров в БД быть не должно (см. supabase/2026-06-10-security-and-fixes.sql).
+// Инкремент (а не пересчёт суммой платежей), чтобы не затирать ручные
+// корректировки paid из редактирования заказа и возвратов.
+async function adjustOrderPaid(orderId: string, delta: number): Promise<void> {
+  const supabase = createClient()
+  const { data: order, error } = await supabase
+    .from('crm_orders')
+    .select('paid')
+    .eq('id', orderId)
+    .single()
+  if (error) throw error
+  const paid = Math.max(0, (order?.paid ?? 0) + delta)
+  const { error: updError } = await supabase
+    .from('crm_orders')
+    .update({ paid, updated_at: new Date().toISOString() })
+    .eq('id', orderId)
+  if (updError) throw updError
+}
+
 export async function createCRMPayment(
   input: Omit<CRMPayment, 'id' | 'created_at' | 'order' | 'client'>,
 ): Promise<CRMPayment> {
@@ -358,17 +425,25 @@ export async function createCRMPayment(
     .select()
     .single()
   if (error) throw error
+  if (input.order_id) await adjustOrderPaid(input.order_id, input.amount)
   invalidateCache('payments', 'orders', 'dashboard')
   return data
 }
 
 export async function deleteCRMPayment(id: string): Promise<void> {
   const supabase = createClient()
+  // Запоминаем платёж до удаления, чтобы скорректировать paid заказа
+  const { data: payment } = await supabase
+    .from('crm_payments')
+    .select('order_id, amount')
+    .eq('id', id)
+    .single()
   const { error } = await supabase
     .from('crm_payments')
     .delete()
     .eq('id', id)
   if (error) throw error
+  if (payment?.order_id) await adjustOrderPaid(payment.order_id, -payment.amount)
   invalidateCache('payments', 'orders', 'dashboard')
 }
 
@@ -460,12 +535,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     getOrders(),
     getPayments(),
     getExpenses(),
-    getHiddenTransactions(), // загружаем скрытые (инфраструктура для фильтрации)
   ])
-
-  // CRM платежи не скрываются — они управляются через удаление.
-  // Сайтовые транзакции фильтруются на странице /transactions.
-  const visiblePayments = payments.filter(() => true)
 
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -477,7 +547,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const completedOrders = orders.filter(o => o.status === 'completed').length
   const newOrders       = orders.filter(o => o.status === 'new').length
 
-  const monthPayments = visiblePayments.filter(
+  const monthPayments = payments.filter(
     p => new Date(p.payment_date) >= startOfMonth,
   )
   const monthExpenses = expenses.filter(
@@ -540,11 +610,14 @@ export async function globalSearch(
   if (query.length < 2) return { orders: [], clients: [] }
 
   const supabase = createClient()
-  const num = parseInt(query, 10)
+  // Экранируем символы, ломающие синтаксис фильтра PostgREST (.or-строка)
+  const safe = query.replace(/[,()%\\]/g, ' ').trim()
+  if (safe.length < 2) return { orders: [], clients: [] }
+  const num = parseInt(safe, 10)
 
   const ordersFilter = !isNaN(num)
-    ? `project_name.ilike.%${query}%,order_number.eq.${num}`
-    : `project_name.ilike.%${query}%`
+    ? `project_name.ilike.%${safe}%,order_number.eq.${num}`
+    : `project_name.ilike.%${safe}%`
 
   const [ordersRes, clientsRes] = await Promise.all([
     supabase
@@ -555,7 +628,7 @@ export async function globalSearch(
     supabase
       .from('crm_clients')
       .select('id, name, telegram, discord')
-      .or(`name.ilike.%${query}%,telegram.ilike.%${query}%,discord.ilike.%${query}%`)
+      .or(`name.ilike.%${safe}%,telegram.ilike.%${safe}%,discord.ilike.%${safe}%`)
       .limit(5),
   ])
 

@@ -10,30 +10,10 @@ import { StatCard } from '@/components/crm/stat-card'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
 import { CreatePaymentModal } from '@/components/crm/modals/create-payment-modal'
 import { ViewPaymentModal } from '@/components/crm/modals/view-payment-modal'
-import { getPayments, getExpenses, getOrders, getHiddenTransactions } from '@/lib/crm/api'
-import type { HiddenTransaction } from '@/lib/crm/api'
-import { formatMoney, formatDate, PAYMENT_METHOD_LABELS } from '@/lib/crm/helpers'
+import { PaymentMethodBadge } from '@/components/crm/status-badge'
+import { getPayments, getExpenses, getOrders } from '@/lib/crm/api'
+import { formatMoney, formatDate } from '@/lib/crm/helpers'
 import type { CRMPayment, CRMOrder, CRMExpense } from '@/types/crm'
-
-// ── Method badge ──────────────────────────────────────────────────────────────
-
-const METHOD_COLORS: Record<string, { color: string; bg: string }> = {
-  card:     { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
-  transfer: { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
-  crypto:   { color: 'var(--crm-yellow)', bg: 'var(--crm-yellow-dim)' },
-  paypal:   { color: 'var(--crm-purple)', bg: 'var(--crm-purple-dim)' },
-  other:    { color: 'var(--crm-muted)',  bg: 'rgba(100,116,139,0.12)' },
-}
-
-function MethodBadge({ method }: { method: string | null }) {
-  const key = method ?? 'other'
-  const cfg = METHOD_COLORS[key] ?? METHOD_COLORS.other
-  return (
-    <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:cfg.color,background:cfg.bg }}>
-      {PAYMENT_METHOD_LABELS[key] ?? key}
-    </span>
-  )
-}
 
 // ── Comment display ───────────────────────────────────────────────────────────
 
@@ -91,23 +71,20 @@ export default function FinancePage() {
   const [payments,   setPayments]   = useState<CRMPayment[]>([])
   const [expenses,   setExpenses]   = useState<CRMExpense[]>([])
   const [orders,     setOrders]     = useState<CRMOrder[]>([])
-  const [hidden,     setHidden]     = useState<HiddenTransaction[]>([])
   const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState<string | null>(null)
   const [modalOpen,  setModalOpen]  = useState(false)
   const [viewPayment, setViewPayment] = useState<CRMPayment | null>(null)
 
-  // Идентификаторы скрытых сайтовых транзакций (инфраструктура — для будущей фильтрации)
-  const hiddenPurchaseIds = hidden.filter(h => h.source_type === 'purchase').map(h => h.source_id)
-  const hiddenBtxIds      = hidden.filter(h => h.source_type === 'balance_transaction').map(h => h.source_id)
-  void hiddenPurchaseIds; void hiddenBtxIds // используются на странице /transactions
-
-  const loadAll = useCallback(async () => {
-    setLoading(true)
+  // quiet=true — тихое обновление после модалок, без мигания скелетоном
+  const loadAll = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true)
+    setError(null)
     try {
-      const [p, e, o, h] = await Promise.all([getPayments(), getExpenses(), getOrders(), getHiddenTransactions()])
-      setPayments(p); setExpenses(e); setOrders(o); setHidden(h)
-    } catch (err) { console.error(err) }
-    finally { setLoading(false) }
+      const [p, e, o] = await Promise.all([getPayments(), getExpenses(), getOrders()])
+      setPayments(p); setExpenses(e); setOrders(o)
+    } catch { setError('Не удалось загрузить финансы') }
+    finally { if (!quiet) setLoading(false) }
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -152,6 +129,10 @@ export default function FinancePage() {
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:20 }}>
       <style>{`@keyframes crm-pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+
+      {error && (
+        <div style={{ padding:'14px 16px',borderRadius:10,background:'var(--crm-red-dim)',color:'var(--crm-red)',fontSize:13 }}>{error}</div>
+      )}
 
       {/* ── Row 1: This month ── */}
       <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12 }}>
@@ -251,7 +232,7 @@ export default function FinancePage() {
                       <SensitiveValue>+{formatMoney(p.amount)}</SensitiveValue>
                     </td>
                     <td style={{ padding:'12px 14px' }}>
-                      <MethodBadge method={p.payment_method}/>
+                      <PaymentMethodBadge method={p.payment_method}/>
                     </td>
                     <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>
                       {formatDate(p.payment_date)}
@@ -268,7 +249,7 @@ export default function FinancePage() {
           {!loading && (
             <div style={{ padding:'14px 16px',borderTop:'1px solid var(--crm-border2)' }}>
               <span style={{ fontSize:13,color:'var(--crm-muted)' }}>
-                Показано {payments.length} из {payments.length} платежей
+                Всего {payments.length} платежей
               </span>
             </div>
           )}
@@ -279,7 +260,7 @@ export default function FinancePage() {
       <CreatePaymentModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSuccess={() => loadAll()}
+        onSuccess={() => loadAll(true)}
       />
       <ViewPaymentModal
         payment={viewPayment}

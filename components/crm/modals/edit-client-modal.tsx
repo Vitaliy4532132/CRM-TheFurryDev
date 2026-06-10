@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 import { updateCRMClient } from '@/lib/crm/api'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
@@ -63,12 +63,23 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
     }
   }, [client])
 
+  // Исходные значения — подтверждение закрытия только при реальных изменениях
+  const initial = useMemo(() => client ? {
+    name:     client.name ?? '',
+    telegram: client.telegram ?? '',
+    discord:  client.discord  ?? '',
+    email:    client.email    ?? '',
+    country:  client.country  ?? '',
+    note:     client.note     ?? '',
+  } : undefined, [client])
+
+  // ESC закрывает через handleClose — с подтверждением, если есть изменения
   useEffect(() => {
     if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(form, onClose, initial) }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [open, onClose])
+  }, [open, onClose, handleClose, form, initial])
 
   const set = (key: keyof typeof form) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -77,6 +88,9 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
   async function handleSubmit() {
     if (!client) return
     if (!form.name.trim()) { setError('Укажите имя клиента'); return }
+    if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) {
+      setError('Некорректный email'); return
+    }
     setLoading(true)
     setError(null)
     try {
@@ -126,7 +140,7 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
             Редактировать клиента
           </span>
           <button
-            onClick={() => handleClose(form, onClose)}
+            onClick={() => handleClose(form, onClose, initial)}
             style={{
               width: 30, height: 30, borderRadius: 8,
               background: 'var(--crm-s3)', border: 'none', cursor: 'pointer',
@@ -191,7 +205,7 @@ export function EditClientModal({ open, onClose, onSuccess, client }: EditClient
           padding: '16px 24px', borderTop: '1px solid var(--crm-border2)', flexShrink: 0,
         }}>
           <button
-            onClick={() => handleClose(form, onClose)}
+            onClick={() => handleClose(form, onClose, initial)}
             disabled={loading}
             style={{
               height: 36, padding: '0 18px', borderRadius: 8,

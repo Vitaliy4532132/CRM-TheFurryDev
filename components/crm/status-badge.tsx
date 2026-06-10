@@ -1,3 +1,5 @@
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/crm/helpers'
+
 type OrderStatus =
   | 'В работе'
   | 'Ожидает оплату'
@@ -60,6 +62,22 @@ export function StatusBadge({ status }: StatusBadgeProps) {
 }
 
 export type { OrderStatus, PaymentStatus, BadgeStatus }
+
+// ── OrderStatusBadge (по DB-ключу статуса) ────────────────────────────────────
+
+export function OrderStatusBadge({ status }: { status: string }) {
+  const cfg = ORDER_STATUS_COLORS[status] ?? { color: 'var(--crm-muted)', bg: 'rgba(100,116,139,0.12)' }
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '3px 10px', borderRadius: 6,
+      fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+      color: cfg.color, background: cfg.bg,
+    }}>
+      {ORDER_STATUS_LABELS[status] ?? status}
+    </span>
+  )
+}
 
 // ── PaymentMethodBadge ────────────────────────────────────────────────────────
 

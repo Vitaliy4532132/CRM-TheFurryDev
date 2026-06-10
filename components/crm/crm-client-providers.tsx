@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { getOrders, getClients, getPayments, getServices } from '@/lib/crm/api'
+import { Toaster } from '@/components/crm/toast'
 
 // ── Prefetch ──────────────────────────────────────────────────────────────────
 // Загружает основные данные в кеш сразу при входе в CRM.
@@ -59,6 +60,7 @@ export function CRMClientProviders() {
     <>
       <DataPrefetcher />
       <NavigationLoader />
+      <Toaster />
     </>
   )
 }

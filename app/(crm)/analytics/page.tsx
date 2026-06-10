@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   TrendingUp, TrendingDown, BarChart2, UserPlus,
   Trophy, Calculator, Star, Clock, AlertTriangle, BarChart3,
-  ShoppingBag, Code, Package,
+  ShoppingBag, Code, Package, ClipboardList,
 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -14,6 +14,7 @@ import { getPayments, getExpenses, getOrders, getClients, getProductsStats } fro
 import {
   formatMoney, formatDate, getDateRange, getPrevDateRange,
   getGrouping, getBucketLabel, getBucketMs,
+  EXPENSE_CATEGORY_LABELS, PAYMENT_METHOD_LABELS,
 } from '@/lib/crm/helpers'
 import type { CRMPayment, CRMExpense, CRMOrder, CRMClient } from '@/types/crm'
 
@@ -46,17 +47,6 @@ const EXPENSE_COLORS: Record<string, string> = {
   commission: '#eab308',
   refund:     '#ef4444',
   other:      '#64748b',
-}
-
-const EXPENSE_LABELS: Record<string, string> = {
-  ads:        'Реклама',
-  hosting:    'Хостинг',
-  domain:     'Домен',
-  plugins:    'Плагины',
-  salary:     'Зарплата',
-  commission: 'Комиссии',
-  refund:     'Возврат',
-  other:      'Другое',
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -117,7 +107,7 @@ function buildExpensesByCategory(expenses: CRMExpense[]): { name: string; value:
   expenses.forEach(e => { map[e.category] = (map[e.category] || 0) + e.amount })
   return Object.entries(map)
     .map(([cat, value]) => ({
-      name:  EXPENSE_LABELS[cat] ?? cat,
+      name:  EXPENSE_CATEGORY_LABELS[cat] ?? cat,
       value,
       color: EXPENSE_COLORS[cat] ?? '#64748b',
     }))
@@ -256,6 +246,7 @@ export default function AnalyticsPage() {
   const [orders,    setOrders]    = useState<CRMOrder[]>([])
   const [clients,   setClients]   = useState<CRMClient[]>([])
   const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState(false)
   const [showAllPayments, setShowAllPayments] = useState(false)
   const [productsRaw, setProductsRaw] = useState<ProductStatRow[]>([])
 
@@ -263,7 +254,7 @@ export default function AnalyticsPage() {
     setLoading(true)
     Promise.all([getPayments(), getExpenses(), getOrders(), getClients(), getProductsStats()])
       .then(([p, e, o, c, ps]) => { setPayments(p); setExpenses(e); setOrders(o); setClients(c); setProductsRaw(ps as unknown as ProductStatRow[]) })
-      .catch(console.error)
+      .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [])
 
@@ -381,6 +372,12 @@ export default function AnalyticsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <style>{`@keyframes crm-pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+
+      {error && (
+        <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--crm-red-dim)', color: 'var(--crm-red)', fontSize: 13 }}>
+          Не удалось загрузить аналитику. Обновите страницу.
+        </div>
+      )}
 
       {/* ── Period selector ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
@@ -506,7 +503,7 @@ export default function AnalyticsPage() {
                         active && payload?.length ? (
                           <div style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
                             <span style={{ color: payload[0].payload.color, fontWeight: 600 }}>{payload[0].name}</span>
-                            <div style={{ color: 'var(--crm-text)' }}>{formatMoney(payload[0].value as number)}</div>
+                            <div style={{ color: 'var(--crm-text)' }} className="crm-sensitive">{formatMoney(payload[0].value as number)}</div>
                           </div>
                         ) : null
                       }/>
@@ -518,7 +515,7 @@ export default function AnalyticsPage() {
                     <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }}/>
                       <span style={{ color: 'var(--crm-muted)' }}>{d.name}</span>
-                      <span style={{ color: 'var(--crm-text)', fontWeight: 600 }}>{formatMoney(d.value)}</span>
+                      <span style={{ color: 'var(--crm-text)', fontWeight: 600 }} className="crm-sensitive">{formatMoney(d.value)}</span>
                     </div>
                   ))}
                 </div>
@@ -663,7 +660,7 @@ export default function AnalyticsPage() {
                                 active && payload?.length ? (
                                   <div style={{ background: 'var(--crm-surface)', border: '1px solid var(--crm-border2)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
                                     <span style={{ color: (payload[0].payload as { color: string }).color, fontWeight: 600 }}>{payload[0].name}</span>
-                                    <div style={{ color: 'var(--crm-text)', marginTop: 2 }}>{formatMoney(payload[0].value as number)}</div>
+                                    <div style={{ color: 'var(--crm-text)', marginTop: 2 }} className="crm-sensitive">{formatMoney(payload[0].value as number)}</div>
                                   </div>
                                 ) : null
                               }/>
@@ -761,6 +758,12 @@ export default function AnalyticsPage() {
               sub={`${debtorCount} должников`}
               accent sensitive
             />
+            <StatCard
+              icon={ClipboardList} title="Заказов за период"
+              value={String(fo.length)}
+              sub={fo.length > 0 ? `на ${formatMoney(fo.reduce((s, o) => s + o.amount, 0))}` : 'Нет заказов'}
+              sensitive
+            />
           </div>
         )}
       </div>
@@ -796,7 +799,6 @@ export default function AnalyticsPage() {
                   </thead>
                   <tbody>
                     {shownPayments.map((p, i) => {
-                      const METHOD_LABELS: Record<string, string> = { card:'Карта', transfer:'Перевод', crypto:'Крипта', paypal:'PayPal', other:'Другое' }
                       return (
                         <tr key={p.id} style={{ borderBottom: i < shownPayments.length - 1 ? '1px solid var(--crm-border)' : 'none', transition: 'background 0.12s' }}
                           onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-surface-hover)'}}
@@ -805,10 +807,10 @@ export default function AnalyticsPage() {
                             {p.client?.name ?? clientMap.get(p.client_id ?? '') ?? '—'}
                           </td>
                           <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: 'var(--crm-green)', whiteSpace: 'nowrap' }}>
-                            +{formatMoney(p.amount)}
+                            <span className="crm-sensitive">+{formatMoney(p.amount)}</span>
                           </td>
                           <td style={{ padding: '11px 14px', fontSize: 12, color: 'var(--crm-muted)' }}>
-                            {p.payment_method ? (METHOD_LABELS[p.payment_method] ?? p.payment_method) : '—'}
+                            {p.payment_method ? (PAYMENT_METHOD_LABELS[p.payment_method] ?? p.payment_method) : '—'}
                           </td>
                           <td style={{ padding: '11px 14px', fontSize: 12, color: 'var(--crm-muted)', whiteSpace: 'nowrap' }}>
                             {new Date(p.payment_date).toLocaleDateString('ru-RU')}

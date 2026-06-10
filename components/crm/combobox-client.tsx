@@ -20,7 +20,7 @@ function Avatar({ name }: { name: string }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 11, fontWeight: 700,
     }}>
-      {name[0].toUpperCase()}
+      {name[0]?.toUpperCase() ?? '?'}
     </div>
   )
 }
@@ -197,9 +197,11 @@ export function ComboboxClient({ value, onChange, clients, onClientCreated }: Pr
       <CreateClientModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onSuccess={() => {
+        onSuccess={(created) => {
           setCreateOpen(false)
           onClientCreated()
+          // Сразу выбираем созданного клиента
+          onChange(created.id)
         }}
       />
     </div>

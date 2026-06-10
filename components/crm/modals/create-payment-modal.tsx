@@ -175,13 +175,20 @@ export function CreatePaymentModal({
       .catch(() => setLoadingOrd(false))
   }, [selectedClientId])
 
-  // Escape
+  // Escape — через handleClose, с подтверждением если есть изменения
   useEffect(() => {
     if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose(
+          { amount, bank, paymentNote, comment, selectedClientId: selectedClientId ?? '', selectedOrderId: selectedOrderId ?? '' },
+          onClose,
+        )
+      }
+    }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [open, onClose])
+  }, [open, onClose, handleClose, amount, bank, paymentNote, comment, selectedClientId, selectedOrderId])
 
   function buildComment(): string | null {
     const note = (payType === 'Карта' ? bank : paymentNote).trim()

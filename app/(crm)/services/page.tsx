@@ -6,6 +6,8 @@ import type { LucideIcon } from 'lucide-react'
 import { getServices, updateCRMService, deleteCRMService } from '@/lib/crm/api'
 import { CreateServiceModal } from '@/components/crm/modals/create-service-modal'
 import { EditServiceModal } from '@/components/crm/modals/edit-service-modal'
+import { ConfirmDialog } from '@/components/crm/confirm-dialog'
+import { toast } from '@/components/crm/toast'
 import { formatMoney } from '@/lib/crm/helpers'
 import type { CRMService } from '@/types/crm'
 
@@ -150,12 +152,16 @@ export default function ServicesPage() {
   const [editingService, setEditingService] = useState<CRMService | null>(null)
   const [search,         setSearch]         = useState('')
   const [statusFilter,   setStatusFilter]   = useState('')
+  const [error,          setError]          = useState<string | null>(null)
+  const [deletingService, setDeletingService] = useState<CRMService | null>(null)
 
-  const loadServices = useCallback(async () => {
-    setLoading(true)
+  // quiet=true — тихое обновление после модалок, без мигания скелетоном
+  const loadServices = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true)
+    setError(null)
     try { setServices(await getServices()) }
-    catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    catch { setError('Не удалось загрузить услуги') }
+    finally { if (!quiet) setLoading(false) }
   }, [])
 
   useEffect(() => { loadServices() }, [loadServices])
@@ -170,17 +176,24 @@ export default function ServicesPage() {
     } catch {
       // Откат при ошибке
       setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: service.is_active } : s))
+      toast.error('Не удалось изменить статус услуги')
     }
   }
 
   // ── Удаление ──────────────────────────────────────────────────────────────
 
-  async function handleDelete(service: CRMService) {
-    if (!window.confirm(`Удалить услугу "${service.name}"? Это действие нельзя отменить.`)) return
+  async function confirmDelete() {
+    if (!deletingService) return
+    const service = deletingService
     try {
       await deleteCRMService(service.id)
       setServices(prev => prev.filter(s => s.id !== service.id))
-    } catch { alert('Не удалось удалить услугу') }
+      toast.success(`Услуга «${service.name}» удалена`)
+    } catch {
+      toast.error('Не удалось удалить услугу')
+    } finally {
+      setDeletingService(null)
+    }
   }
 
   // ── Фильтрация ─────────────────────────────────────────────────────────────
@@ -195,6 +208,10 @@ export default function ServicesPage() {
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:20 }}>
       <style>{`@keyframes crm-pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+
+      {error && (
+        <div style={{ padding:'14px 16px',borderRadius:10,background:'var(--crm-red-dim)',color:'var(--crm-red)',fontSize:13 }}>{error}</div>
+      )}
 
       {/* ── Header ── */}
       <div style={{ display:'flex',justifyContent:'flex-end' }}>
@@ -237,7 +254,7 @@ export default function ServicesPage() {
               service={service}
               onToggle={() => handleToggle(service)}
               onEdit={() => setEditingService(service)}
-              onDelete={() => handleDelete(service)}
+              onDelete={() => setDeletingService(service)}
             />
           ))}
         </div>
@@ -258,12 +275,19 @@ export default function ServicesPage() {
         </div>
       )}
 
-      <CreateServiceModal open={modalOpen} onClose={()=>setModalOpen(false)} onSuccess={loadServices}/>
+      <CreateServiceModal open={modalOpen} onClose={()=>setModalOpen(false)} onSuccess={()=>loadServices(true)}/>
       <EditServiceModal
         open={editingService !== null}
         onClose={()=>setEditingService(null)}
         service={editingService}
-        onSuccess={()=>{ setEditingService(null); loadServices() }}
+        onSuccess={()=>{ setEditingService(null); loadServices(true) }}
+      />
+      <ConfirmDialog
+        open={deletingService !== null}
+        title={deletingService ? `Удалить услугу «${deletingService.name}»?` : ''}
+        description="Заказы с этой услугой останутся, но потеряют привязку. Это действие нельзя отменить."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingService(null)}
       />
     </div>
   )

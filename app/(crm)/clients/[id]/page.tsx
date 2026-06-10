@@ -14,31 +14,11 @@ import {
   getClientTransactions, getClientPurchases, getSiteProfile,
 } from '@/lib/crm/api'
 import type { BalanceTx, SitePurchase, SiteProfile } from '@/lib/crm/api'
-import { ORDER_STATUS_LABELS } from '@/types/crm'
 import { RefundTransferModal } from '@/components/crm/modals/refund-transfer-modal'
-import { getPreferredPayment, formatMoney } from '@/lib/crm/helpers'
-import { PaymentMethodBadge } from '@/components/crm/status-badge'
+import { getPreferredPayment, formatMoney, formatDate } from '@/lib/crm/helpers'
+import { PaymentMethodBadge, OrderStatusBadge } from '@/components/crm/status-badge'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
 import type { CRMClient, CRMOrder, CRMPayment } from '@/types/crm'
-
-// ── Status badge ─────────────────────────────────────────────────────────────
-
-const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
-  new:             { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
-  discussion:      { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
-  waiting_payment: { color: 'var(--crm-yellow)', bg: 'var(--crm-yellow-dim)' },
-  in_progress:     { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
-  review:          { color: 'var(--crm-purple)', bg: 'var(--crm-purple-dim)' },
-  revision:        { color: 'var(--crm-orange)', bg: 'var(--crm-orange-dim)' },
-  done:            { color: 'var(--crm-muted)',  bg: 'rgba(100,116,139,0.12)' },
-  completed:       { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
-  cancelled:       { color: 'var(--crm-red)',    bg: 'var(--crm-red-dim)' },
-}
-
-function StatusChip({ status }: { status: string }) {
-  const cfg = STATUS_COLORS[status] ?? { color:'var(--crm-muted)', bg:'rgba(100,116,139,0.12)' }
-  return <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:cfg.color,background:cfg.bg }}>{ORDER_STATUS_LABELS[status as keyof typeof ORDER_STATUS_LABELS] ?? status}</span>
-}
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -100,11 +80,6 @@ function MiniStat({ label, value, icon:Icon, color, sensitive }: { label:string;
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string) {
-  const d = new Date(iso)
-  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`
-}
-
 function money(n: number) { return formatMoney(n) }
 
 // ── History ───────────────────────────────────────────────────────────────────
@@ -137,10 +112,10 @@ const HISTORY_ICON: Record<HistoryEventType, { icon: typeof CreditCard; color: s
 }
 
 function buildClientHistory(data: {
-  payments:     any[]
-  orders:       any[]
-  transactions: any[]
-  purchases:    any[]
+  payments:     CRMPayment[]
+  orders:       CRMOrder[]
+  transactions: BalanceTx[]
+  purchases:    SitePurchase[]
 }): HistoryEvent[] {
   const events: HistoryEvent[] = []
 
@@ -249,6 +224,7 @@ export default function ClientCardPage() {
   const [siteProfile,  setSiteProfile]  = useState<SiteProfile | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [notFound,     setNotFound]     = useState(false)
+  const [loadError,    setLoadError]    = useState(false)
   const [showAllTopups,setShowAllTopups]= useState(false)
   const [refundOpen,   setRefundOpen]   = useState(false)
   const [historyFilter, setHistoryFilter] = useState<'all' | 'payments' | 'orders' | 'site'>('all')
@@ -266,38 +242,46 @@ export default function ClientCardPage() {
   const [saveError,  setSaveError]   = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     async function load() {
       setLoading(true)
+      setLoadError(false)
       try {
         const [allClients, allOrders, allPayments] = await Promise.all([
           getClients(),
           getOrders(),
           getPayments(),
         ])
+        if (cancelled) return
         const c = allClients.find(cl => cl.id === id)
         if (!c) { setNotFound(true); return }
         const o = allOrders.filter(ord => ord.client_id === id)
         const p = allPayments.filter(pmt => pmt.client_id === id)
         setClient(c); setOrders(o); setPayments(p)
 
-        // Load site data if linked to a profile
+        // Сайтовые данные грузим НЕ блокируя рендер CRM-части
+        // (баланс показывает «Загрузка...» пока не придёт)
         if (c.profile_id) {
-          const [txns, purchases, prof] = await Promise.all([
-            getClientTransactions(c.profile_id),
-            getClientPurchases(c.profile_id),
-            getSiteProfile(c.profile_id),
-          ])
-          setTransactions(txns)
-          setSitePurchases(purchases)
-          setSiteProfile(prof)
+          const profileId = c.profile_id
+          Promise.all([
+            getClientTransactions(profileId),
+            getClientPurchases(profileId),
+            getSiteProfile(profileId),
+          ]).then(([txns, purchases, prof]) => {
+            if (cancelled) return
+            setTransactions(txns)
+            setSitePurchases(purchases)
+            setSiteProfile(prof)
+          }).catch(() => { /* сайт-данные не критичны для карточки */ })
         }
       } catch {
-        setNotFound(true)
+        if (!cancelled) setLoadError(true) // сетевая ошибка ≠ 404
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     load()
+    return () => { cancelled = true }
   }, [id])
 
   // ── Refresh after payment changes ─────────────────────────────────────────
@@ -381,6 +365,15 @@ export default function ClientCardPage() {
     )
   }
 
+  if (!loading && loadError) {
+    return (
+      <div style={{ display:'flex',flexDirection:'column',alignItems:'center',gap:16,padding:'60px 0' }}>
+        <div style={{ fontSize:16,color:'var(--crm-text)' }}>Не удалось загрузить клиента</div>
+        <Link href="/clients" style={{ fontSize:13,color:'var(--crm-blue)',textDecoration:'none',fontWeight:500 }}>← Назад к клиентам</Link>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:20 }}>
 
@@ -409,7 +402,7 @@ export default function ClientCardPage() {
               <>
                 <div style={{ display:'flex',alignItems:'center',gap:16 }}>
                   <div style={{ width:64,height:64,borderRadius:'50%',background:'var(--crm-blue-dim)',color:'var(--crm-blue)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,fontWeight:700,flexShrink:0 }}>
-                    {client.name[0].toUpperCase()}
+                    {client.name[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div style={{ flex:1 }}>
                     <div style={{ display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' }}>
@@ -712,7 +705,7 @@ export default function ClientCardPage() {
                         <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-blue)',whiteSpace:'nowrap' }}>{order.service?.name ?? '—'}</td>
                         <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-text)',whiteSpace:'nowrap' }}>{order.project_name}</td>
                         <td style={{ padding:'12px 14px',fontSize:13,fontWeight:700,color:'var(--crm-text)',whiteSpace:'nowrap' }}><SensitiveValue>{money(order.amount)}</SensitiveValue></td>
-                        <td style={{ padding:'12px 14px' }}><StatusChip status={order.status}/></td>
+                        <td style={{ padding:'12px 14px' }}><OrderStatusBadge status={order.status}/></td>
                         <td style={{ padding:'12px 14px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>{formatDate(order.created_at)}</td>
                       </tr>
                     ))}

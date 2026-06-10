@@ -12,7 +12,6 @@ import {
   BarChart3,
   ArrowDownCircle,
   Layers,
-  Settings,
   LogOut,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -28,7 +27,8 @@ const navItems = [
   { href: '/analytics',     label: 'Аналитика',   icon: BarChart3 },
   { href: '/expenses',   label: 'Расходы',   icon: ArrowDownCircle },
   { href: '/services',   label: 'Услуги',    icon: Layers },
-  { href: '/settings',   label: 'Настройки', icon: Settings },
+  // Настройки скрыты: страница пока декоративная (кнопки не сохраняют).
+  // Вернуть, когда будет реализована: { href: '/settings', label: 'Настройки', icon: Settings },
 ]
 
 export function Sidebar() {
@@ -36,7 +36,11 @@ export function Sidebar() {
   const router = useRouter()
 
   async function handleLogout() {
-    await createClient().auth.signOut()
+    try {
+      await createClient().auth.signOut()
+    } catch {
+      // даже при ошибке signOut уводим на логин — middleware дорешает
+    }
     router.push('/login')
     router.refresh()
   }

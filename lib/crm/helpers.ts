@@ -70,6 +70,10 @@ export function formatMoney(amount: number): string {
 }
 
 export function formatDate(iso: string): string {
+  // DATE-колонки приходят как 'YYYY-MM-DD' — парсим вручную,
+  // иначе new Date() даст UTC-полночь и сдвинет день в западных таймзонах
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (m) return `${m[3]}.${m[2]}.${m[1]}`
   const d = new Date(iso)
   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`
 }
@@ -80,8 +84,8 @@ export function getPaymentStatus(
   amount: number,
   paid: number,
 ): { label: string; color: string } {
-  if (amount === 0 || paid === 0) return { label: 'Не оплачен', color: 'var(--crm-red)' }
-  if (paid >= amount)             return { label: 'Оплачен',    color: 'var(--crm-green)' }
+  if (paid <= 0)      return { label: 'Не оплачен', color: 'var(--crm-red)' }
+  if (paid >= amount) return { label: 'Оплачен',    color: 'var(--crm-green)' }
   return {
     label: `${paid.toLocaleString('ru-RU')} / ${amount.toLocaleString('ru-RU')} ₽`,
     color: 'var(--crm-orange)',

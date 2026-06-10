@@ -5,11 +5,13 @@ import { X, Loader2, AlertCircle } from 'lucide-react'
 import { createCRMClient } from '@/lib/crm/api'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
 import { ConfirmCloseModal } from '@/components/crm/confirm-close-modal'
+import type { CRMClient } from '@/types/crm'
 
 interface CreateClientModalProps {
   open: boolean
   onClose: () => void
-  onSuccess: () => void
+  // Передаём созданного клиента — вызывающие могут сразу его выбрать
+  onSuccess: (client: CRMClient) => void
 }
 
 const fieldStyle: React.CSSProperties = {
@@ -71,12 +73,13 @@ export function CreateClientModal({ open, onClose, onSuccess }: CreateClientModa
     if (open) { setForm(EMPTY); setError(null) }
   }, [open])
 
+  // ESC закрывает через handleClose — с подтверждением, если есть изменения
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(form, onClose) }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [open, onClose])
+  }, [open, onClose, handleClose, form])
 
   const set = (key: keyof typeof EMPTY) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -84,10 +87,13 @@ export function CreateClientModal({ open, onClose, onSuccess }: CreateClientModa
 
   async function handleSubmit() {
     if (!form.name.trim()) { setError('Укажите имя клиента'); return }
+    if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) {
+      setError('Некорректный email'); return
+    }
     setLoading(true)
     setError(null)
     try {
-      await createCRMClient({
+      const created = await createCRMClient({
         name:     form.name.trim(),
         telegram: form.telegram.trim() || null,
         discord:  form.discord.trim()  || null,
@@ -95,7 +101,7 @@ export function CreateClientModal({ open, onClose, onSuccess }: CreateClientModa
         country:  form.country.trim()  || null,
         note:     form.note.trim()     || null,
       })
-      onSuccess()
+      onSuccess(created)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось создать клиента')

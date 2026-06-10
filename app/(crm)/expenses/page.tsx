@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   TrendingDown, Receipt, Users, List,
   Search, Plus, Pencil, Trash2,
@@ -9,6 +9,8 @@ import { StatCard } from '@/components/crm/stat-card'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
 import { CreateExpenseModal } from '@/components/crm/modals/create-expense-modal'
 import { EditExpenseModal } from '@/components/crm/modals/edit-expense-modal'
+import { ConfirmDialog } from '@/components/crm/confirm-dialog'
+import { toast } from '@/components/crm/toast'
 import { getExpenses, deleteCRMExpense } from '@/lib/crm/api'
 import { formatMoney, formatDate, EXPENSE_CATEGORY_LABELS } from '@/lib/crm/helpers'
 import type { CRMExpense, ExpenseCategory } from '@/types/crm'
@@ -104,12 +106,16 @@ export default function ExpensesPage() {
   const [search,         setSearch]         = useState('')
   const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | ''>('')
   const [period,         setPeriod]         = useState('')
+  const [error,          setError]          = useState<string | null>(null)
+  const [deletingExpense, setDeletingExpense] = useState<CRMExpense | null>(null)
 
-  const loadExpenses = useCallback(async () => {
-    setLoading(true)
+  // quiet=true — тихое обновление после модалок, без мигания скелетоном
+  const loadExpenses = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true)
+    setError(null)
     try { setExpenses(await getExpenses()) }
-    catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    catch { setError('Не удалось загрузить расходы') }
+    finally { if (!quiet) setLoading(false) }
   }, [])
 
   useEffect(() => { loadExpenses() }, [loadExpenses])
@@ -121,7 +127,7 @@ export default function ExpensesPage() {
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const startOfYear      = new Date(now.getFullYear(), 0, 1)
 
-  const filtered = expenses.filter(e => {
+  const filtered = useMemo(() => expenses.filter(e => {
     if (search && !e.name.toLowerCase().includes(search.toLowerCase())) return false
     if (categoryFilter && e.category !== categoryFilter) return false
     const d = new Date(e.date)
@@ -129,7 +135,9 @@ export default function ExpensesPage() {
     if (period === 'last_month' && (d < startOfLastMonth || d >= startOfMonth)) return false
     if (period === 'year'       && d < startOfYear)      return false
     return true
-  })
+    // startOf* пересоздаются каждый рендер, но их значения стабильны в рамках дня
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [expenses, search, categoryFilter, period])
 
   // ── Статистика ─────────────────────────────────────────────────────────────
 
@@ -148,17 +156,27 @@ export default function ExpensesPage() {
 
   // ── Удаление ───────────────────────────────────────────────────────────────
 
-  async function handleDelete(exp: CRMExpense) {
-    if (!window.confirm(`Удалить расход "${exp.name}"? Это действие нельзя отменить.`)) return
+  async function confirmDelete() {
+    if (!deletingExpense) return
+    const exp = deletingExpense
     try {
       await deleteCRMExpense(exp.id)
       setExpenses(prev => prev.filter(e => e.id !== exp.id))
-    } catch { alert('Не удалось удалить расход') }
+      toast.success(`Расход «${exp.name}» удалён`)
+    } catch {
+      toast.error('Не удалось удалить расход')
+    } finally {
+      setDeletingExpense(null)
+    }
   }
 
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:20 }}>
       <style>{`@keyframes crm-pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
+
+      {error && (
+        <div style={{ padding:'14px 16px',borderRadius:10,background:'var(--crm-red-dim)',color:'var(--crm-red)',fontSize:13 }}>{error}</div>
+      )}
 
       {/* ── Stats ── */}
       <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12 }}>
@@ -268,7 +286,7 @@ export default function ExpensesPage() {
                     <td style={{ padding:'12px 14px' }}>
                       <div style={{ display:'flex',alignItems:'center',justifyContent:'flex-end',gap:6 }}>
                         <ActionButton icon={Pencil} title="Редактировать" onClick={()=>setEditingExpense(exp)}/>
-                        <ActionButton icon={Trash2} title="Удалить" danger onClick={()=>handleDelete(exp)}/>
+                        <ActionButton icon={Trash2} title="Удалить" danger onClick={()=>setDeletingExpense(exp)}/>
                       </div>
                     </td>
                   </tr>
@@ -287,12 +305,18 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      <CreateExpenseModal open={modalOpen} onClose={()=>setModalOpen(false)} onSuccess={loadExpenses}/>
+      <CreateExpenseModal open={modalOpen} onClose={()=>setModalOpen(false)} onSuccess={()=>loadExpenses(true)}/>
       <EditExpenseModal
         open={editingExpense !== null}
         onClose={()=>setEditingExpense(null)}
         expense={editingExpense}
-        onSuccess={()=>{ setEditingExpense(null); loadExpenses() }}
+        onSuccess={()=>{ setEditingExpense(null); loadExpenses(true) }}
+      />
+      <ConfirmDialog
+        open={deletingExpense !== null}
+        title={deletingExpense ? `Удалить расход «${deletingExpense.name}»?` : ''}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingExpense(null)}
       />
     </div>
   )

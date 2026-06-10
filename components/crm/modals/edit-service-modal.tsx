@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 import { updateCRMService } from '@/lib/crm/api'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
@@ -48,12 +48,20 @@ export function EditServiceModal({ open, onClose, onSuccess, service }: EditServ
     setError(null)
   }, [service])
 
+  // Исходные значения — подтверждение закрытия только при реальных изменениях
+  const initial = useMemo(() => service ? {
+    name:        service.name,
+    description: service.description ?? '',
+    minPrice:    String(service.min_price),
+  } : undefined, [service])
+
+  // ESC закрывает через handleClose — с подтверждением, если есть изменения
   useEffect(() => {
     if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose({ name, description, minPrice }, onClose, initial) }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [open, onClose])
+  }, [open, onClose, handleClose, initial, name, description, minPrice])
 
   async function handleSubmit() {
     if (!service) return
@@ -81,7 +89,7 @@ export function EditServiceModal({ open, onClose, onSuccess, service }: EditServ
 
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid var(--crm-border2)',flexShrink:0 }}>
           <span style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)' }}>Редактировать услугу</span>
-          <button onClick={() => handleClose({ name, description, minPrice }, onClose)} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => handleClose({ name, description, minPrice }, onClose, initial)} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)';e.currentTarget.style.color='var(--crm-red)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             <X size={15} strokeWidth={2}/>
@@ -115,7 +123,7 @@ export function EditServiceModal({ open, onClose, onSuccess, service }: EditServ
         </div>
 
         <div style={{ display:'flex',justifyContent:'flex-end',gap:10,padding:'16px 24px',borderTop:'1px solid var(--crm-border2)',flexShrink:0 }}>
-          <button onClick={() => handleClose({ name, description, minPrice }, onClose)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => handleClose({ name, description, minPrice }, onClose, initial)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-border2)';e.currentTarget.style.color='var(--crm-text)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             Отмена

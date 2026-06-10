@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Eye, Pencil, Trash2, ClipboardList } from 'lucide-react'
 import Link from 'next/link'
@@ -8,8 +8,11 @@ import { getOrders, getClients, getServices, deleteCRMOrder } from '@/lib/crm/ap
 import { CreateOrderModal } from '@/components/crm/modals/create-order-modal'
 import { EditOrderModal } from '@/components/crm/modals/edit-order-modal'
 import { OrdersFilters } from '@/components/crm/filters/orders-filters'
+import { ConfirmDialog } from '@/components/crm/confirm-dialog'
+import { OrderStatusBadge } from '@/components/crm/status-badge'
+import { toast } from '@/components/crm/toast'
 import {
-  ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
+  ORDER_STATUS_LABELS,
   formatMoney, formatDate, getDeadlineColor, getPaymentStatus,
 } from '@/lib/crm/helpers'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
@@ -33,17 +36,6 @@ function SkeletonRow() {
         </div>
       </td>
     </tr>
-  )
-}
-
-// ── Status badge ──────────────────────────────────────────────────────────────
-
-function OrderStatusBadge({ status }: { status: string }) {
-  const cfg = ORDER_STATUS_COLORS[status] ?? { color: 'var(--crm-muted)', bg: 'rgba(100,116,139,0.12)' }
-  return (
-    <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:cfg.color,background:cfg.bg }}>
-      {ORDER_STATUS_LABELS[status] ?? status}
-    </span>
   )
 }
 
@@ -81,6 +73,20 @@ function isLastMonth(iso: string) {
 
 const thStyle: React.CSSProperties = { padding:'11px 14px',textAlign:'left',fontSize:11,fontWeight:600,letterSpacing:'0.06em',color:'var(--crm-muted)',textTransform:'uppercase',borderBottom:'1px solid var(--crm-border2)',whiteSpace:'nowrap' }
 
+// ── Приоритет статусов (активные → новые → завершённые) ──────────────────────
+
+const STATUS_PRIORITY: Record<string, number> = {
+  in_progress:     0,
+  review:          1,
+  revision:        2,
+  discussion:      3,
+  waiting_payment: 4,
+  new:             5,
+  done:            6,
+  completed:       7,
+  cancelled:       8,
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
@@ -96,14 +102,17 @@ export default function OrdersPage() {
   const [statusOrder,   setStatusOrder]   = useState('')
   const [statusPayment, setStatusPayment] = useState('')
   const [dateRange,     setDateRange]     = useState('')
+  const [deletingOrder, setDeletingOrder] = useState<CRMOrder | null>(null)
 
-  const loadAll = useCallback(async () => {
-    setLoading(true); setError(null)
+  // quiet=true — тихое обновление после модалок, без мигания скелетоном
+  const loadAll = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true)
+    setError(null)
     try {
       const [o, c, s] = await Promise.all([getOrders(), getClients(), getServices()])
       setOrders(o); setClients(c); setServices(s)
     } catch { setError('Не удалось загрузить заказы') }
-    finally { setLoading(false) }
+    finally { if (!quiet) setLoading(false) }
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -114,65 +123,57 @@ export default function OrdersPage() {
     setClients(c)
   }, [])
 
-  // ── Приоритет статусов ─────────────────────────────────────────────────────
+  // ── Фильтрация + сортировка (активные → новые → остальные) ────────────────
 
-  const STATUS_PRIORITY: Record<string, number> = {
-    in_progress:     0,
-    review:          1,
-    revision:        2,
-    discussion:      3,
-    waiting_payment: 4,
-    new:             5,
-    done:            6,
-    completed:       7,
-    cancelled:       8,
-  }
+  const sortedOrders = useMemo(() => {
+    const filtered = orders.filter(o => {
+      // Поиск
+      if (search) {
+        const q = search.toLowerCase()
+        const matches =
+          o.project_name.toLowerCase().includes(q) ||
+          (o.client?.name ?? '').toLowerCase().includes(q) ||
+          String(o.order_number).includes(q)
+        if (!matches) return false
+      }
+      // Статус (фильтр использует русские строки из OrdersFilters)
+      if (statusOrder) {
+        const dbVal = Object.entries(ORDER_STATUS_LABELS).find(([, v]) => v === statusOrder)?.[0]
+        if (dbVal && o.status !== dbVal) return false
+      }
+      // Оплата
+      if (statusPayment === 'Оплачен' && !(o.paid >= o.amount && o.amount > 0)) return false
+      if (statusPayment === 'Частично' && !(o.paid > 0 && o.paid < o.amount)) return false
+      if (statusPayment === 'Не оплачен' && o.paid !== 0) return false
+      // Дата
+      if (dateRange === 'today'      && !isToday(o.created_at))     return false
+      if (dateRange === 'week'       && !isThisWeek(o.created_at))  return false
+      if (dateRange === 'month'      && !isThisMonth(o.created_at)) return false
+      if (dateRange === 'last_month' && !isLastMonth(o.created_at)) return false
+      return true
+    })
 
-  // ── Фильтрация ─────────────────────────────────────────────────────────────
-
-  const filtered = orders.filter(o => {
-    // Поиск
-    if (search) {
-      const q = search.toLowerCase()
-      const matches =
-        o.project_name.toLowerCase().includes(q) ||
-        (o.client?.name ?? '').toLowerCase().includes(q) ||
-        String(o.order_number).includes(q)
-      if (!matches) return false
-    }
-    // Статус (фильтр использует русские строки из OrdersFilters)
-    if (statusOrder) {
-      const dbVal = Object.entries(ORDER_STATUS_LABELS).find(([, v]) => v === statusOrder)?.[0]
-      if (dbVal && o.status !== dbVal) return false
-    }
-    // Оплата
-    if (statusPayment === 'Оплачен' && !(o.paid >= o.amount && o.amount > 0)) return false
-    if (statusPayment === 'Частично' && !(o.paid > 0 && o.paid < o.amount)) return false
-    if (statusPayment === 'Не оплачен' && o.paid !== 0) return false
-    // Дата
-    if (dateRange === 'today'      && !isToday(o.created_at))     return false
-    if (dateRange === 'week'       && !isThisWeek(o.created_at))  return false
-    if (dateRange === 'month'      && !isThisMonth(o.created_at)) return false
-    if (dateRange === 'last_month' && !isLastMonth(o.created_at)) return false
-    return true
-  })
-
-  // ── Сортировка: активные → новые → остальные, внутри группы — новые сверху ─
-
-  const sortedOrders = [...filtered].sort((a, b) => {
-    const priorityDiff = (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9)
-    if (priorityDiff !== 0) return priorityDiff
-    return b.order_number - a.order_number
-  })
+    return filtered.sort((a, b) => {
+      const priorityDiff = (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9)
+      if (priorityDiff !== 0) return priorityDiff
+      return b.order_number - a.order_number
+    })
+  }, [orders, search, statusOrder, statusPayment, dateRange])
 
   // ── Удаление ───────────────────────────────────────────────────────────────
 
-  async function handleDelete(order: CRMOrder) {
-    if (!window.confirm(`Удалить заказ #${order.order_number}? Это действие нельзя отменить.`)) return
+  async function confirmDelete() {
+    if (!deletingOrder) return
+    const order = deletingOrder
     try {
       await deleteCRMOrder(order.id)
       setOrders(prev => prev.filter(o => o.id !== order.id))
-    } catch { alert('Не удалось удалить заказ') }
+      toast.success(`Заказ #${order.order_number} удалён`)
+    } catch {
+      toast.error('Не удалось удалить заказ')
+    } finally {
+      setDeletingOrder(null)
+    }
   }
 
   return (
@@ -286,7 +287,7 @@ export default function OrdersPage() {
                       <div style={{ display:'flex',alignItems:'center',justifyContent:'flex-end',gap:6 }}>
                         <ActionButton icon={Eye}    title="Просмотр"       href={`/orders/${order.id}`}/>
                         <ActionButton icon={Pencil} title="Редактировать"  onClick={() => setEditingOrder(order)}/>
-                        <ActionButton icon={Trash2} title="Удалить" danger onClick={() => handleDelete(order)}/>
+                        <ActionButton icon={Trash2} title="Удалить" danger onClick={() => setDeletingOrder(order)}/>
                       </div>
                     </td>
                   </tr>
@@ -309,7 +310,7 @@ export default function OrdersPage() {
       <CreateOrderModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSuccess={loadAll}
+        onSuccess={() => loadAll(true)}
         clients={clients}
         services={services}
         onClientCreated={refreshClients}
@@ -318,10 +319,17 @@ export default function OrdersPage() {
         open={editingOrder !== null}
         onClose={() => setEditingOrder(null)}
         order={editingOrder}
-        onSuccess={() => { setEditingOrder(null); loadAll() }}
+        onSuccess={() => { setEditingOrder(null); loadAll(true) }}
         clients={clients}
         services={services}
         onClientCreated={refreshClients}
+      />
+      <ConfirmDialog
+        open={deletingOrder !== null}
+        title={deletingOrder ? `Удалить заказ #${deletingOrder.order_number}?` : ''}
+        description="Заказ и связь с платежами будут удалены. Это действие нельзя отменить."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingOrder(null)}
       />
 
       <style>{`

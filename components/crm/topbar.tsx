@@ -4,25 +4,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useRef, useState, useEffect, useCallback, Suspense } from 'react'
 import { Search, Plus, Loader2, ClipboardList, Users, SearchX, Eye, EyeOff } from 'lucide-react'
 import { globalSearch, type SearchOrderResult, type SearchClientResult } from '@/lib/crm/api'
-import { ORDER_STATUS_LABELS } from '@/lib/crm/helpers'
+import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/crm/helpers'
 import { usePrivacyMode } from '@/hooks/usePrivacyMode'
 
 // ── Status badge (mini) ───────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
-  new:             { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
-  discussion:      { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
-  waiting_payment: { color: 'var(--crm-yellow)', bg: 'var(--crm-yellow-dim)' },
-  in_progress:     { color: 'var(--crm-blue)',   bg: 'var(--crm-blue-dim)' },
-  review:          { color: 'var(--crm-purple)', bg: 'var(--crm-purple-dim)' },
-  revision:        { color: 'var(--crm-orange)', bg: 'var(--crm-orange-dim)' },
-  done:            { color: 'var(--crm-muted)',  bg: 'rgba(100,116,139,0.12)' },
-  completed:       { color: 'var(--crm-teal)',   bg: 'var(--crm-teal-dim)' },
-  cancelled:       { color: 'var(--crm-red)',    bg: 'var(--crm-red-dim)' },
-}
-
 function MiniStatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_COLORS[status] ?? { color:'var(--crm-muted)', bg:'rgba(100,116,139,0.12)' }
+  const cfg = ORDER_STATUS_COLORS[status] ?? { color:'var(--crm-muted)', bg:'rgba(100,116,139,0.12)' }
   return (
     <span style={{ display:'inline-flex',alignItems:'center',padding:'2px 7px',borderRadius:4,fontSize:10,fontWeight:600,color:cfg.color,background:cfg.bg,whiteSpace:'nowrap' }}>
       {ORDER_STATUS_LABELS[status] ?? status}
@@ -33,14 +21,15 @@ function MiniStatusBadge({ status }: { status: string }) {
 // ── Page titles ───────────────────────────────────────────────────────────────
 
 const pageTitles: Record<string, string> = {
-  '/dashboard': 'Главная',
-  '/orders':    'Заказы',
-  '/clients':   'Клиенты',
-  '/finance':    'Финансы',
-  '/analytics':  'Аналитика',
-  '/expenses':   'Расходы',
-  '/services':  'Услуги',
-  '/settings':  'Настройки',
+  '/dashboard':    'Главная',
+  '/orders':       'Заказы',
+  '/clients':      'Клиенты',
+  '/finance':      'Финансы',
+  '/transactions': 'Транзакции',
+  '/analytics':    'Аналитика',
+  '/expenses':     'Расходы',
+  '/services':     'Услуги',
+  '/settings':     'Настройки',
 }
 
 // ── Search component ──────────────────────────────────────────────────────────
@@ -54,19 +43,21 @@ function SearchBox() {
   const [loading, setLoading] = useState(false)
   const [open,    setOpen]    = useState(false)
 
-  // Debounced search
+  // Debounced search (с защитой от гонки: устаревший ответ не перезаписывает свежий)
   useEffect(() => {
     if (query.length < 2) { setResults(null); setLoading(false); return }
     setLoading(true)
+    let cancelled = false
     const timer = setTimeout(async () => {
       try {
         const r = await globalSearch(query)
+        if (cancelled) return
         setResults(r)
         setOpen(true)
       } catch { /* ignore */ }
-      finally { setLoading(false) }
+      finally { if (!cancelled) setLoading(false) }
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [query])
 
   // Click-outside to close

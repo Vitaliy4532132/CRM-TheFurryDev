@@ -96,12 +96,15 @@ export function CreateOrderModal({
     }
   }, [open])
 
+  // ESC закрывает через handleClose — с подтверждением, если есть изменения
   useEffect(() => {
     if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose({ ...form, paymentMethod, cardRegion, bankName, paymentNote }, onClose)
+    }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [open, onClose])
+  }, [open, onClose, handleClose, form, paymentMethod, cardRegion, bankName, paymentNote])
 
   const set = <K extends keyof typeof EMPTY>(key: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -121,7 +124,8 @@ export function CreateOrderModal({
         project_name: form.projectName.trim(),
         description:  form.description.trim() || null,
         amount:       parseInt(form.amount || '0', 10),
-        paid:         parseInt(form.paid   || '0', 10),
+        // paid выставит createCRMPayment ниже — иначе сумма задвоится
+        paid:         0,
         deadline:     form.deadline || null,
         status:       dbStatus as import('@/types/crm').OrderStatus,
         comment:      form.comment.trim() || null,

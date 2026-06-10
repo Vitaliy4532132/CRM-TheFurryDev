@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 import { updateCRMOrder } from '@/lib/crm/api'
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges'
@@ -68,12 +68,29 @@ export function EditOrderModal({
     setError(null)
   }, [order])
 
+  // Исходные значения — чтобы подтверждение показывалось только при реальных изменениях
+  const initial = useMemo(() => order ? {
+    clientId:    order.client_id,
+    serviceId:   order.service_id ?? '',
+    projectName: order.project_name,
+    description: order.description ?? '',
+    amount:      String(order.amount),
+    paid:        String(order.paid),
+    deadline:    order.deadline ?? '',
+    statusRu:    ORDER_STATUS_LABELS[order.status] ?? 'Новый',
+    comment:     order.comment ?? '',
+  } : undefined, [order])
+
+  const fields = { clientId, serviceId, projectName, description, amount, paid, deadline, statusRu, comment }
+
+  // ESC закрывает через handleClose — с подтверждением, если есть изменения
   useEffect(() => {
     if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(fields, onClose, initial) }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [open, onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, onClose, handleClose, initial, clientId, serviceId, projectName, description, amount, paid, deadline, statusRu, comment])
 
   async function handleSubmit() {
     if (!order) return
@@ -115,7 +132,7 @@ export function EditOrderModal({
           <span style={{ fontSize:15,fontWeight:700,color:'var(--crm-text)' }}>
             Редактировать заказ {order ? `#${order.order_number}` : ''}
           </span>
-          <button onClick={() => handleClose({ clientId, serviceId, projectName, description, amount, paid, deadline, statusRu, comment }, onClose)} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => handleClose(fields, onClose, initial)} style={{ width:30,height:30,borderRadius:8,background:'var(--crm-s3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--crm-muted)',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)';e.currentTarget.style.color='var(--crm-red)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             <X size={15} strokeWidth={2}/>
@@ -183,7 +200,7 @@ export function EditOrderModal({
 
         {/* Footer */}
         <div style={{ display:'flex',justifyContent:'flex-end',gap:10,padding:'16px 24px',borderTop:'1px solid var(--crm-border2)',flexShrink:0 }}>
-          <button onClick={() => handleClose({ clientId, serviceId, projectName, description, amount, paid, deadline, statusRu, comment }, onClose)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
+          <button onClick={() => handleClose(fields, onClose, initial)} disabled={loading} style={{ height:36,padding:'0 18px',borderRadius:8,background:'var(--crm-s3)',border:'1px solid var(--crm-border2)',color:'var(--crm-muted)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s,color 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-border2)';e.currentTarget.style.color='var(--crm-text)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             Отмена

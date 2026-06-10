@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserPlus, Search, Send, Eye, Pencil, Trash2, Users, ShoppingCart, Globe } from 'lucide-react'
 import Link from 'next/link'
-import { getClients, deleteCRMClient } from '@/lib/crm/api'
+import { getClients, getOrders, deleteCRMClient } from '@/lib/crm/api'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
 import { CreateClientModal } from '@/components/crm/modals/create-client-modal'
 import { EditClientModal } from '@/components/crm/modals/edit-client-modal'
+import { ConfirmDialog } from '@/components/crm/confirm-dialog'
+import { toast } from '@/components/crm/toast'
+import { formatDate } from '@/lib/crm/helpers'
 import type { CRMClient } from '@/types/crm'
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -67,7 +70,7 @@ function Avatar({ name }: { name: string }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 13, fontWeight: 700, flexShrink: 0, letterSpacing: '-0.02em',
     }}>
-      {name[0].toUpperCase()}
+      {name[0]?.toUpperCase() ?? '?'}
     </div>
   )
 }
@@ -130,11 +133,6 @@ const inputBase: React.CSSProperties = {
   transition: 'border-color 0.15s',
 }
 
-function formatDate(iso: string) {
-  const d = new Date(iso)
-  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ClientsPage() {
@@ -146,17 +144,26 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<CRMClient | null>(null)
   const [search,        setSearch]        = useState('')
   const [sort,          setSort]          = useState('')
+  const [ordersCount,   setOrdersCount]   = useState<Map<string, number>>(new Map())
+  const [deletingClient, setDeletingClient] = useState<CRMClient | null>(null)
 
-  const loadClients = useCallback(async () => {
-    setLoading(true)
+  // quiet=true — тихое обновление после модалок, без мигания скелетоном
+  const loadClients = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true)
     setError(null)
     try {
-      const data = await getClients()
+      // getOrders берётся из кеша (prefetch) — нужен для колонки «Заказов»
+      const [data, orders] = await Promise.all([getClients(), getOrders()])
       setClients(data)
+      const counts = new Map<string, number>()
+      orders.forEach(o => {
+        if (o.client_id) counts.set(o.client_id, (counts.get(o.client_id) ?? 0) + 1)
+      })
+      setOrdersCount(counts)
     } catch {
       setError('Не удалось загрузить клиентов')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [])
 
@@ -164,7 +171,7 @@ export default function ClientsPage() {
 
   // ── Фильтрация и сортировка ───────────────────────────────────────────────
 
-  const filtered = clients
+  const filtered = useMemo(() => clients
     .filter(c => {
       if (!search) return true
       const q = search.toLowerCase()
@@ -178,17 +185,21 @@ export default function ClientsPage() {
     .sort((a, b) => {
       if (sort === 'name') return a.name.localeCompare(b.name, 'ru')
       return 0 // default: по дате (уже отсортировано API)
-    })
+    }), [clients, search, sort])
 
   // ── Удаление ──────────────────────────────────────────────────────────────
 
-  async function handleDelete(client: CRMClient) {
-    if (!window.confirm(`Удалить клиента ${client.name}? Это действие нельзя отменить.`)) return
+  async function confirmDelete() {
+    if (!deletingClient) return
+    const client = deletingClient
     try {
       await deleteCRMClient(client.id)
       setClients(prev => prev.filter(c => c.id !== client.id))
+      toast.success(`Клиент ${client.name} удалён`)
     } catch {
-      alert('Не удалось удалить клиента')
+      toast.error('Не удалось удалить клиента')
+    } finally {
+      setDeletingClient(null)
     }
   }
 
@@ -369,7 +380,7 @@ export default function ClientsPage() {
                     {client.country ?? '—'}
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', textAlign: 'center' }}>
-                    <SensitiveValue>{String(client.orders?.length ?? 0)}</SensitiveValue>
+                    <SensitiveValue>{String(ordersCount.get(client.id) ?? 0)}</SensitiveValue>
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
                     {client.total_spent > 0 ? (
@@ -388,7 +399,7 @@ export default function ClientsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                       <ActionButton icon={Eye}    title="Карточка клиента" href={`/clients/${client.id}`} />
                       <ActionButton icon={Pencil} title="Редактировать"    onClick={() => setEditingClient(client)} />
-                      <ActionButton icon={Trash2} title="Удалить"          danger onClick={() => handleDelete(client)} />
+                      <ActionButton icon={Trash2} title="Удалить"          danger onClick={() => setDeletingClient(client)} />
                     </div>
                   </td>
                 </tr>
@@ -411,13 +422,20 @@ export default function ClientsPage() {
       <CreateClientModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSuccess={loadClients}
+        onSuccess={() => loadClients(true)}
       />
       <EditClientModal
         open={editingClient !== null}
         onClose={() => setEditingClient(null)}
         client={editingClient}
-        onSuccess={() => { setEditingClient(null); loadClients() }}
+        onSuccess={() => { setEditingClient(null); loadClients(true) }}
+      />
+      <ConfirmDialog
+        open={deletingClient !== null}
+        title={deletingClient ? `Удалить клиента ${deletingClient.name}?` : ''}
+        description="Заказы клиента останутся, но потеряют привязку. Это действие нельзя отменить."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingClient(null)}
       />
 
       <style>{`

@@ -40,12 +40,15 @@ export function CreateServiceModal({ open, onClose, onSuccess }: CreateServiceMo
     if (open) { setForm(EMPTY); setError(null) }
   }, [open])
 
+  // ESC закрывает через handleClose — с подтверждением, если есть изменения
   useEffect(() => {
     if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose({ name: form.name, description: form.description, minPrice: form.minPrice }, onClose)
+    }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [open, onClose])
+  }, [open, onClose, handleClose, form])
 
   async function handleSubmit() {
     if (!form.name.trim()) { setError('Укажите название услуги'); return }

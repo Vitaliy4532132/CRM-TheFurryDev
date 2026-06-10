@@ -8,8 +8,9 @@ import {
   TrendingUp, TrendingDown, BarChart2, AlertTriangle, CalendarClock,
 } from 'lucide-react'
 import { StatCard } from '@/components/crm/stat-card'
+import { OrderStatusBadge } from '@/components/crm/status-badge'
 import { getDashboardStats } from '@/lib/crm/api'
-import { formatMoney, formatDate, getDeadlineColor, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/crm/helpers'
+import { formatMoney, formatDate, getDeadlineColor } from '@/lib/crm/helpers'
 import type { DashboardStats, CRMOrder } from '@/types/crm'
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -21,11 +22,6 @@ function StatSkel() {
       <div style={{ height:28,width:80,background:'var(--crm-s3)',borderRadius:6,animation:'crm-pulse 1.5s ease-in-out infinite' }}/>
     </div>
   )
-}
-
-function OrderStatusBadge({ status }: { status: string }) {
-  const cfg = ORDER_STATUS_COLORS[status] ?? { color:'var(--crm-muted)',bg:'rgba(100,116,139,0.12)' }
-  return <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:cfg.color,background:cfg.bg }}>{ORDER_STATUS_LABELS[status] ?? status}</span>
 }
 
 function SensitiveValue({ children }: { children: React.ReactNode }) {
@@ -41,8 +37,6 @@ function PaymentChip({ amount, paid }: { amount: number; paid: number }) {
 
 function OrderRow({ order, isLast }: { order: CRMOrder; isLast: boolean }) {
   const router = useRouter()
-  const thStyle: React.CSSProperties = { padding:'11px 16px',textAlign:'left',fontSize:11,fontWeight:600,letterSpacing:'0.06em',color:'var(--crm-muted)',textTransform:'uppercase',borderBottom:'1px solid var(--crm-border2)',whiteSpace:'nowrap' }
-  void thStyle
   return (
     <tr style={{ borderBottom: isLast ? 'none' : '1px solid var(--crm-border)', cursor:'pointer', transition:'background 0.12s' }}
       onClick={() => router.push('/orders/' + order.id)}
@@ -85,11 +79,12 @@ function OrderRow({ order, isLast }: { order: CRMOrder; isLast: boolean }) {
 export default function DashboardPage() {
   const [stats,   setStats]   = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(false)
 
   useEffect(() => {
     getDashboardStats()
       .then(setStats)
-      .catch(console.error)
+      .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [])
 
@@ -101,6 +96,12 @@ export default function DashboardPage() {
 
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:24 }}>
+
+      {error && (
+        <div style={{ padding:'14px 16px',borderRadius:10,background:'var(--crm-red-dim)',color:'var(--crm-red)',fontSize:13 }}>
+          Не удалось загрузить данные. Обновите страницу.
+        </div>
+      )}
 
       {/* ── Row 1: Order stats ── */}
       <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12 }}>

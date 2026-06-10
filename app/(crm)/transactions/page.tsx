@@ -7,20 +7,27 @@ import {
   Eye, EyeOff, ArrowLeftRight, Trash2, Search,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import {
   getPayments, getExpenses,
+  getAllSiteTransactions, getAllSitePurchases,
   getHiddenTransactions, hideTransaction, unhideTransaction,
   deleteCRMPayment, deleteCRMExpense,
 } from '@/lib/crm/api'
+import type { SiteBalanceTx, SitePurchaseRow } from '@/lib/crm/api'
 import { formatMoney, formatDate } from '@/lib/crm/helpers'
 import { EXPENSE_CATEGORY_LABELS } from '@/types/crm'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
+import { ConfirmDialog } from '@/components/crm/confirm-dialog'
+import { toast } from '@/components/crm/toast'
 import type { CRMPayment, CRMExpense } from '@/types/crm'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SourceType = 'payment' | 'expense' | 'balance_transaction' | 'purchase'
+
+// 'neutral' — покупка с внутреннего баланса: реальные деньги уже учтены
+// при пополнении, поэтому в KPI «Доход» не входит (иначе удвоение).
+type Flow = 'income' | 'expense' | 'neutral'
 
 interface UnifiedTransaction {
   id:           string
@@ -30,7 +37,7 @@ interface UnifiedTransaction {
   title:        string
   subtitle:     string
   amount:       number
-  flow:         'income' | 'expense'
+  flow:         Flow
   client_name?: string
   order_id?:    string | null
   is_hidden:    boolean
@@ -52,14 +59,17 @@ const PAGE_SIZE = 20
 function buildTransactions(
   payments:  CRMPayment[],
   expenses:  CRMExpense[],
-  balanceTx: any[],
-  purchases: any[],
+  balanceTx: SiteBalanceTx[],
+  purchases: SitePurchaseRow[],
   hidden:    { source_type: string; source_id: string }[],
 ): UnifiedTransaction[] {
   const all: UnifiedTransaction[] = []
 
+  // Set для O(1)-проверки скрытых вместо .some() в цикле
+  const hiddenSet = new Set(hidden.map(h => h.source_type + ':' + h.source_id))
+
   payments.forEach(p => {
-    const order = p.order as any
+    const order = p.order
     all.push({
       id:          'pay_' + p.id,
       source_type: 'payment',
@@ -103,11 +113,12 @@ function buildTransactions(
         subtitle:    t.description || t.profile?.nickname || '—',
         amount:      t.amount,
         flow:        'income',
-        client_name: t.profile?.nickname,
-        is_hidden:   hidden.some(h => h.source_type === 'balance_transaction' && h.source_id === t.id),
+        client_name: t.profile?.nickname ?? undefined,
+        is_hidden:   hiddenSet.has('balance_transaction:' + t.id),
       })
     })
 
+  // Покупки с баланса — нейтральные: деньги уже зачтены при пополнении
   purchases.forEach(p => {
     all.push({
       id:          'pur_' + p.id,
@@ -117,9 +128,9 @@ function buildTransactions(
       title:       'Покупка на сайте',
       subtitle:    p.product?.name || 'Удалённый продукт',
       amount:      Number(p.amount),
-      flow:        'income',
-      client_name: p.profile?.nickname,
-      is_hidden:   hidden.some(h => h.source_type === 'purchase' && h.source_id === p.id),
+      flow:        'neutral',
+      client_name: p.profile?.nickname ?? undefined,
+      is_hidden:   hiddenSet.has('purchase:' + p.id),
     })
   })
 
@@ -221,43 +232,40 @@ export default function TransactionsPage() {
   const router = useRouter()
   const [payments,    setPayments]    = useState<CRMPayment[]>([])
   const [expenses,    setExpenses]    = useState<CRMExpense[]>([])
-  const [balanceTx,   setBalanceTx]   = useState<any[]>([])
-  const [purchases,   setPurchases]   = useState<any[]>([])
+  const [balanceTx,   setBalanceTx]   = useState<SiteBalanceTx[]>([])
+  const [purchases,   setPurchases]   = useState<SitePurchaseRow[]>([])
   const [hidden,      setHidden]      = useState<{ source_type: string; source_id: string }[]>([])
   const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState<string | null>(null)
   const [showHidden,  setShowHidden]  = useState(false)
   const [search,      setSearch]      = useState('')
   const [flowFilter,  setFlowFilter]  = useState<'all' | 'income' | 'expense'>('all')
   const [srcFilter,   setSrcFilter]   = useState<'all' | SourceType>('all')
   const [period,      setPeriod]      = useState<'7d' | '30d' | '90d' | 'all'>('all')
   const [page,        setPage]        = useState(1)
+  const [deletingTx,  setDeletingTx]  = useState<UnifiedTransaction | null>(null)
 
-  const loadAll = useCallback(async () => {
-    setLoading(true)
+  // quiet=true — тихое обновление после действий, без мигания скелетоном
+  const loadAll = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true)
+    setError(null)
     try {
-      const supabase = createClient()
-      const [p, e, btxRes, purRes, h] = await Promise.all([
+      const [p, e, btx, pur, h] = await Promise.all([
         getPayments(),
         getExpenses(),
-        supabase
-          .from('balance_transactions')
-          .select('*, profile:profiles(nickname, telegram)')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('purchases')
-          .select('*, product:products(name, slug), profile:profiles(nickname)')
-          .order('created_at', { ascending: false }),
+        getAllSiteTransactions(),
+        getAllSitePurchases(),
         getHiddenTransactions(),
       ])
       setPayments(p)
       setExpenses(e)
-      setBalanceTx(btxRes.data ?? [])
-      setPurchases(purRes.data ?? [])
+      setBalanceTx(btx)
+      setPurchases(pur)
       setHidden(h)
-    } catch (err) {
-      console.error(err)
+    } catch {
+      setError('Не удалось загрузить транзакции')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [])
 
@@ -317,27 +325,39 @@ export default function TransactionsPage() {
 
   // ── Actions ──────────────────────────────────────────────────────────────────
 
-  async function handleDelete(tx: UnifiedTransaction, e: React.MouseEvent) {
-    e.stopPropagation()
-    const msg = tx.source_type === 'payment'
-      ? 'Удалить транзакцию? Сумма будет вычтена из оплаченного по заказу. Это действие нельзя отменить.'
-      : 'Удалить транзакцию? Это действие нельзя отменить.'
-    if (!window.confirm(msg)) return
-    if (tx.source_type === 'payment') await deleteCRMPayment(tx.source_id)
-    else await deleteCRMExpense(tx.source_id)
-    await loadAll()
+  async function confirmDelete() {
+    if (!deletingTx) return
+    const tx = deletingTx
+    try {
+      if (tx.source_type === 'payment') await deleteCRMPayment(tx.source_id)
+      else await deleteCRMExpense(tx.source_id)
+      await loadAll(true)
+      toast.success('Транзакция удалена')
+    } catch {
+      toast.error('Не удалось удалить транзакцию')
+    } finally {
+      setDeletingTx(null)
+    }
   }
 
   async function handleHide(tx: UnifiedTransaction, e: React.MouseEvent) {
     e.stopPropagation()
-    await hideTransaction(tx.source_type as 'balance_transaction' | 'purchase', tx.source_id)
-    await loadAll()
+    try {
+      await hideTransaction(tx.source_type as 'balance_transaction' | 'purchase', tx.source_id)
+      await loadAll(true)
+    } catch {
+      toast.error('Не удалось скрыть транзакцию')
+    }
   }
 
   async function handleUnhide(tx: UnifiedTransaction, e: React.MouseEvent) {
     e.stopPropagation()
-    await unhideTransaction(tx.source_type as 'balance_transaction' | 'purchase', tx.source_id)
-    await loadAll()
+    try {
+      await unhideTransaction(tx.source_type as 'balance_transaction' | 'purchase', tx.source_id)
+      await loadAll(true)
+    } catch {
+      toast.error('Не удалось показать транзакцию')
+    }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -368,6 +388,10 @@ export default function TransactionsPage() {
           {showHidden ? 'Скрытые показаны' : 'Показать скрытые'}
         </button>
       </div>
+
+      {error && (
+        <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--crm-red-dim)', color: 'var(--crm-red)', fontSize: 13 }}>{error}</div>
+      )}
 
       {/* ── KPI cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
@@ -472,7 +496,14 @@ export default function TransactionsPage() {
                   <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                       <ArrowLeftRight size={48} color="var(--crm-muted)" strokeWidth={1.25} />
-                      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--crm-text)' }}>Транзакций пока нет</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--crm-text)' }}>
+                        {search || flowFilter !== 'all' || srcFilter !== 'all' || period !== 'all'
+                          ? 'Ничего не найдено'
+                          : 'Транзакций пока нет'}
+                      </div>
+                      {(search || flowFilter !== 'all' || srcFilter !== 'all' || period !== 'all') && (
+                        <div style={{ fontSize: 13, color: 'var(--crm-muted)' }}>Попробуйте изменить фильтры</div>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -520,10 +551,10 @@ export default function TransactionsPage() {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center',
                         padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-                        color:      tx.flow === 'income' ? 'var(--crm-green)' : 'var(--crm-red)',
-                        background: tx.flow === 'income' ? 'var(--crm-green-dim)' : 'var(--crm-red-dim)',
+                        color:      tx.flow === 'income' ? 'var(--crm-green)' : tx.flow === 'expense' ? 'var(--crm-red)' : 'var(--crm-purple)',
+                        background: tx.flow === 'income' ? 'var(--crm-green-dim)' : tx.flow === 'expense' ? 'var(--crm-red-dim)' : 'var(--crm-purple-dim)',
                       }}>
-                        {tx.flow === 'income' ? 'Доход' : 'Расход'}
+                        {tx.flow === 'income' ? 'Доход' : tx.flow === 'expense' ? 'Расход' : 'С баланса'}
                       </span>
                     </td>
 
@@ -553,9 +584,9 @@ export default function TransactionsPage() {
                       <SensitiveValue>
                         <span style={{
                           fontSize: 13, fontWeight: 700,
-                          color: tx.flow === 'income' ? 'var(--crm-green)' : 'var(--crm-red)',
+                          color: tx.flow === 'income' ? 'var(--crm-green)' : tx.flow === 'expense' ? 'var(--crm-red)' : 'var(--crm-purple)',
                         }}>
-                          {tx.flow === 'income' ? '+' : '−'}{formatMoney(tx.amount)}
+                          {tx.flow === 'income' ? '+' : tx.flow === 'expense' ? '−' : ''}{formatMoney(tx.amount)}
                         </span>
                       </SensitiveValue>
                     </td>
@@ -580,7 +611,7 @@ export default function TransactionsPage() {
                             title="Удалить"
                             color="var(--crm-red)"
                             hoverBg="var(--crm-red-dim)"
-                            onClick={e => handleDelete(tx, e)}
+                            onClick={e => { e.stopPropagation(); setDeletingTx(tx) }}
                           />
                         )}
                         {isSite && !tx.is_hidden && (
@@ -634,6 +665,16 @@ export default function TransactionsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deletingTx !== null}
+        title="Удалить транзакцию?"
+        description={deletingTx?.source_type === 'payment'
+          ? 'Сумма будет вычтена из оплаченного по заказу. Это действие нельзя отменить.'
+          : 'Это действие нельзя отменить.'}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingTx(null)}
+      />
     </div>
   )
 }

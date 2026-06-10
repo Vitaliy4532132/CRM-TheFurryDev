@@ -12,10 +12,10 @@ import { getOrders, getPayments, getClients, getServices, updateCRMOrder, delete
 import { CreatePaymentModal } from '@/components/crm/modals/create-payment-modal'
 import { ChangeStatusModal } from '@/components/crm/modals/change-status-modal'
 import { EditOrderModal } from '@/components/crm/modals/edit-order-modal'
-import {
-  ORDER_STATUS_LABELS, ORDER_STATUS_COLORS,
-  PAYMENT_METHOD_LABELS, formatMoney, formatDate, getDeadlineColor,
-} from '@/lib/crm/helpers'
+import { ConfirmDialog } from '@/components/crm/confirm-dialog'
+import { OrderStatusBadge, PaymentMethodBadge } from '@/components/crm/status-badge'
+import { toast } from '@/components/crm/toast'
+import { formatMoney, formatDate, getDeadlineColor } from '@/lib/crm/helpers'
 import type { CRMOrder, CRMPayment, CRMClient, CRMService } from '@/types/crm'
 import { SensitiveValue } from '@/components/crm/sensitive-value'
 
@@ -34,25 +34,6 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
       <span style={{ fontSize:13,color:'var(--crm-text)',fontWeight:500 }}>{children}</span>
     </div>
   )
-}
-
-function OrderStatusBadge({ status }: { status: string }) {
-  const cfg = ORDER_STATUS_COLORS[status] ?? { color:'var(--crm-muted)',bg:'rgba(100,116,139,0.12)' }
-  return <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:6,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:cfg.color,background:cfg.bg }}>{ORDER_STATUS_LABELS[status] ?? status}</span>
-}
-
-const METHOD_COLORS: Record<string, { color: string; bg: string }> = {
-  card:     { color:'var(--crm-blue)',   bg:'var(--crm-blue-dim)' },
-  transfer: { color:'var(--crm-teal)',   bg:'var(--crm-teal-dim)' },
-  crypto:   { color:'var(--crm-yellow)', bg:'var(--crm-yellow-dim)' },
-  paypal:   { color:'var(--crm-purple)', bg:'var(--crm-purple-dim)' },
-  other:    { color:'var(--crm-muted)',  bg:'rgba(100,116,139,0.12)' },
-}
-
-function MethodBadge({ method }: { method: string | null }) {
-  const key = method ?? 'other'
-  const cfg = METHOD_COLORS[key] ?? METHOD_COLORS.other
-  return <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 9px',borderRadius:6,fontSize:11,fontWeight:600,color:cfg.color,background:cfg.bg,whiteSpace:'nowrap' }}>{PAYMENT_METHOD_LABELS[key] ?? key}</span>
 }
 
 function ActionBtn({ icon: Icon, label, variant, onClick, disabled }: {
@@ -113,10 +94,12 @@ export default function OrderCardPage() {
   const [services,     setServices]     = useState<CRMService[]>([])
   const [loading,      setLoading]      = useState(true)
   const [notFound,     setNotFound]     = useState(false)
+  const [loadError,    setLoadError]    = useState(false)
   const [statusModal,  setStatusModal]  = useState(false)
   const [paymentModal, setPaymentModal] = useState(false)
   const [editModal,    setEditModal]    = useState(false)
   const [completing,   setCompleting]   = useState(false)
+  const [deleteOpen,   setDeleteOpen]   = useState(false)
 
   const loadOrder = useCallback(async () => {
     try {
@@ -130,17 +113,23 @@ export default function OrderCardPage() {
       if (!o) { setNotFound(true); return }
       const p = allPayments.filter(pmt => pmt.order_id === id)
       setOrder(o); setPayments(p); setClients(c); setServices(s)
-    } catch { setNotFound(true) }
+      setLoadError(false)
+    } catch { setLoadError(true) } // сетевая ошибка ≠ 404
     finally { setLoading(false) }
   }, [id])
 
   useEffect(() => { loadOrder() }, [loadOrder])
 
-  async function handleDelete() {
+  async function confirmDelete() {
     if (!order) return
-    if (!window.confirm(`Удалить заказ #${order.order_number}? Это действие нельзя отменить.`)) return
-    await deleteCRMOrder(order.id)
-    router.push('/orders')
+    try {
+      await deleteCRMOrder(order.id)
+      toast.success(`Заказ #${order.order_number} удалён`)
+      router.push('/orders')
+    } catch {
+      toast.error('Не удалось удалить заказ')
+      setDeleteOpen(false)
+    }
   }
 
   async function handleComplete() {
@@ -148,32 +137,52 @@ export default function OrderCardPage() {
     setCompleting(true)
     try {
       const updated = await updateCRMOrder(order.id, { status: 'completed' })
-      setOrder(updated)
+      // updateCRMOrder возвращает строку без join'ов — сохраняем client/service
+      setOrder({ ...updated, client: order.client, service: order.service })
+      toast.success('Заказ отмечен завершённым')
+    } catch {
+      toast.error('Не удалось обновить статус')
     } finally { setCompleting(false) }
   }
 
   async function handlePaymentCreated(_amount: number) {
     if (!order) return
     // createCRMPayment инвалидировал кеш — загружаем свежие данные
-    const [allOrders, allPayments] = await Promise.all([
-      getOrders(),
-      getPayments(),
-    ])
-    const updatedOrder    = allOrders.find(o => o.id === id)
-    const updatedPayments = allPayments.filter(p => p.order_id === id)
-    if (updatedOrder) setOrder(updatedOrder)
-    setPayments(updatedPayments)
+    try {
+      const [allOrders, allPayments] = await Promise.all([
+        getOrders(),
+        getPayments(),
+      ])
+      const updatedOrder    = allOrders.find(o => o.id === id)
+      const updatedPayments = allPayments.filter(p => p.order_id === id)
+      if (updatedOrder) setOrder(updatedOrder)
+      setPayments(updatedPayments)
+    } catch {
+      toast.error('Платёж создан, но не удалось обновить данные — обновите страницу')
+    }
   }
 
   const refreshClients = useCallback(async () => { const c = await getClients(); setClients(c) }, [])
 
-  // ── Not found ──────────────────────────────────────────────────────────────
+  // ── Not found / error ──────────────────────────────────────────────────────
 
   if (!loading && notFound) {
     return (
       <div style={{ display:'flex',flexDirection:'column',alignItems:'center',gap:16,padding:'60px 0' }}>
         <div style={{ fontSize:48,fontWeight:700,color:'var(--crm-muted)' }}>404</div>
         <div style={{ fontSize:16,color:'var(--crm-text)' }}>Заказ не найден</div>
+        <Link href="/orders" style={{ fontSize:13,color:'var(--crm-blue)',textDecoration:'none',fontWeight:500 }}>← Назад к заказам</Link>
+      </div>
+    )
+  }
+
+  if (!loading && loadError) {
+    return (
+      <div style={{ display:'flex',flexDirection:'column',alignItems:'center',gap:16,padding:'60px 0' }}>
+        <div style={{ fontSize:16,color:'var(--crm-text)' }}>Не удалось загрузить заказ</div>
+        <button onClick={() => { setLoading(true); loadOrder() }} style={{ height:36,padding:'0 16px',borderRadius:8,background:'var(--crm-blue)',border:'none',color:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit' }}>
+          Повторить
+        </button>
         <Link href="/orders" style={{ fontSize:13,color:'var(--crm-blue)',textDecoration:'none',fontWeight:500 }}>← Назад к заказам</Link>
       </div>
     )
@@ -207,7 +216,7 @@ export default function OrderCardPage() {
             onMouseLeave={e=>{e.currentTarget.style.background='var(--crm-s3)';e.currentTarget.style.color='var(--crm-muted)'}}>
             <Pencil size={13} strokeWidth={1.75}/>Редактировать
           </button>
-          <button onClick={handleDelete} style={{ display:'flex',alignItems:'center',gap:6,height:34,padding:'0 14px',borderRadius:8,background:'transparent',border:'1px solid var(--crm-red)',color:'var(--crm-red)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s' }}
+          <button onClick={() => setDeleteOpen(true)} style={{ display:'flex',alignItems:'center',gap:6,height:34,padding:'0 14px',borderRadius:8,background:'transparent',border:'1px solid var(--crm-red)',color:'var(--crm-red)',fontSize:13,fontWeight:500,cursor:'pointer',transition:'background 0.15s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--crm-red-dim)'}}
             onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
             <Trash2 size={13} strokeWidth={1.75}/>Удалить
@@ -351,7 +360,7 @@ export default function OrderCardPage() {
                 <tr key={p.id} style={{ borderBottom: i < payments.length-1 ? '1px solid var(--crm-border)' : 'none' }}>
                   <td style={{ padding:'11px 12px',fontSize:13,color:'var(--crm-muted)',fontWeight:600 }}>{i+1}</td>
                   <td style={{ padding:'11px 12px',fontSize:13,fontWeight:700,color:'var(--crm-green)',whiteSpace:'nowrap' }}><SensitiveValue>+{formatMoney(p.amount)}</SensitiveValue></td>
-                  <td style={{ padding:'11px 12px' }}><MethodBadge method={p.payment_method}/></td>
+                  <td style={{ padding:'11px 12px' }}><PaymentMethodBadge method={p.payment_method}/></td>
                   <td style={{ padding:'11px 12px',fontSize:13,color:'var(--crm-muted)',whiteSpace:'nowrap' }}>{formatDate(p.payment_date)}</td>
                   <td style={{ padding:'11px 12px',fontSize:13,color:'var(--crm-muted)' }}>{p.comment ?? '—'}</td>
                 </tr>
@@ -398,6 +407,13 @@ export default function OrderCardPage() {
         clients={clients}
         services={services}
         onClientCreated={refreshClients}
+      />
+      <ConfirmDialog
+        open={deleteOpen}
+        title={`Удалить заказ #${order.order_number}?`}
+        description="Заказ и связь с платежами будут удалены. Это действие нельзя отменить."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteOpen(false)}
       />
 
       <style>{`

@@ -61,12 +61,22 @@ export function RefundTransferModal({ open, onClose, onSuccess, client, orders }
     }
   }, [open])
 
+  // ESC: после успеха — просто закрыть; иначе через handleClose с подтверждением
   useEffect(() => {
     if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !loading) success ? onClose() : undefined }
+    const h = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || loading) return
+      if (success) { onClose(); return }
+      const fields = action === 'refund'
+        ? { fromOrderId, refundAmount, refundComment }
+        : { transferFromId, transferToId, transferAmount, transferComment }
+      handleClose(fields, onClose)
+    }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [open, onClose, loading, success])
+  }, [open, onClose, loading, success, handleClose, action,
+      fromOrderId, refundAmount, refundComment,
+      transferFromId, transferToId, transferAmount, transferComment])
 
   const paidOrders    = orders.filter(o => o.paid > 0)
   const fromOrder     = orders.find(o => o.id === fromOrderId)
@@ -112,7 +122,7 @@ export function RefundTransferModal({ open, onClose, onSuccess, client, orders }
     setLoading(true); setError(null)
     try {
       await updateCRMOrder(transferFromId, { paid: (tfFromOrder?.paid ?? 0) - num })
-      await updateCRMOrder(transferToId,   { paid: (tfToOrder?.paid ?? 0) + num })
+      // paid заказа-назначения увеличит createCRMPayment — иначе сумма задвоится
       await createCRMPayment({
         order_id:       transferToId,
         client_id:      client.id,
